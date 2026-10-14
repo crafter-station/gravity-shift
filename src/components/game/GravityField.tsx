@@ -4,13 +4,15 @@ import { useFrame } from "@react-three/fiber";
 import { useBeforePhysicsStep } from "@react-three/rapier";
 import { useEffect, useRef } from "react";
 import {
+  Box3,
   type Group,
   MathUtils,
   type Mesh,
   type MeshBasicMaterial,
   Vector3,
 } from "three";
-import { CONFIG } from "@/game/config";
+import { CONFIG, LEVELS } from "@/game/config";
+import { emit } from "@/game/events";
 import { isAttracting } from "@/game/input";
 import { type PropEntry, player, props } from "@/game/registry";
 import { gameStore } from "@/game/store";
@@ -19,6 +21,21 @@ const { field, launch } = CONFIG;
 const toAim = new Vector3();
 const shot = new Vector3();
 const up = new Vector3(0, 1, 0);
+const bounds = new Box3();
+const extentSize = new Vector3();
+/** Minimum ms between "too heavy" hints. */
+const TOO_HEAVY_MS = 1500;
+let lastTooHeavy = 0;
+
+/** Current level stats (orb size, field reach, capacity, liftable tier). */
+function levelSpec() {
+  return LEVELS[gameStore.get().level - 1];
+}
+
+/** Orbit scale grows with the orb so bigger levels make wider, grander orbits. */
+function orbitScale() {
+  return (levelSpec().radius / LEVELS[0].radius) ** 0.8;
+}
 
 /** Heavier props react slower and fly shorter. */
 function massFactor(entry: PropEntry) {
@@ -28,10 +45,16 @@ function massFactor(entry: PropEntry) {
 function capture(entry: PropEntry, angle: number, time: number) {
   entry.held = true;
   entry.projectileUntil = 0;
+  // Big props (cars, the bus) need a wider orbit so they don't clip the orb.
+  bounds.setFromObject(entry.object).getSize(extentSize);
+  const extent = Math.max(extentSize.x, extentSize.z) / 2;
+  const scale = orbitScale();
   // Start the orbit where the prop currently is so it doesn't snap across.
   entry.orbitAngle = angle - time * field.orbitSpeed;
-  entry.orbitRadius = MathUtils.randFloat(...field.orbitRadius);
-  entry.orbitHeight = MathUtils.randFloat(...field.orbitHeight);
+  entry.orbitRadius =
+    MathUtils.randFloat(...field.orbitRadius) * scale + extent * 0.9;
+  entry.orbitHeight =
+    MathUtils.randFloat(...field.orbitHeight) * scale + extent * 0.4;
   entry.body.setGravityScale(0, true);
 }
 
@@ -63,8 +86,15 @@ export function GravityField() {
     const pp = pb.translation();
     const pv = pb.linvel();
 
-    if (wasAttracting.current && !attracting) launchHeld(pp, pv);
+    if (attracting !== wasAttracting.current) {
+      if (attracting) emit("attractStart", {});
+      else {
+        emit("attractEnd", {});
+        launchHeld(pp, pv);
+      }
+    }
     wasAttracting.current = attracting;
+    const lvl = levelSpec();
 
     let held = 0;
     for (const e of props) if (e.held) held++;
@@ -86,10 +116,15 @@ export function GravityField() {
       const dist = Math.hypot(dx, p.y - pp.y, dz);
 
       if (!e.held) {
-        if (dist > field.radius || held >= field.maxHeld) continue;
+        if (dist > lvl.field) continue;
+        if (e.tier > lvl.tier) {
+          tooHeavy(e, p, dist / lvl.field);
+          continue;
+        }
+        if (held >= lvl.maxHeld) continue;
         capture(e, Math.atan2(dz, dx), t);
         held++;
-      } else if (dist > field.radius * 2.5) {
+      } else if (dist > lvl.field * 2.5) {
         drop(e);
         held--;
         continue;
@@ -103,7 +138,7 @@ export function GravityField() {
       const tz = pp.z + Math.sin(a) * e.orbitRadius;
 
       // Closer to the center → stronger pull.
-      const closeness = 1 - MathUtils.clamp(dist / field.radius, 0, 1);
+      const closeness = 1 - MathUtils.clamp(dist / lvl.field, 0, 1);
       const pull =
         (field.steer * (0.3 + 0.7 * closeness)) / Math.sqrt(massFactor(e));
       const k = 1 - Math.exp(-pull * dt);
@@ -149,6 +184,27 @@ export function GravityField() {
   return <FieldVisual />;
 }
 
+/** Props above the player's tier shudder in place: a hint that they need a higher level. */
+function tooHeavy(
+  e: PropEntry,
+  p: { x: number; y: number; z: number },
+  reach: number,
+) {
+  const jolt = (1 - reach) * 0.6 * e.body.mass();
+  e.body.applyImpulse(
+    {
+      x: MathUtils.randFloatSpread(jolt),
+      y: jolt * 0.4 * Math.random(),
+      z: MathUtils.randFloatSpread(jolt),
+    },
+    true,
+  );
+  const now = performance.now();
+  if (now - lastTooHeavy < TOO_HEAVY_MS) return;
+  lastTooHeavy = now;
+  emit("tooHeavy", { x: p.x, y: p.y, z: p.z, tier: e.tier });
+}
+
 /** Fling every held prop toward a point in front of the player. */
 function launchHeld(
   pp: { x: number; y: number; z: number },
@@ -156,6 +212,7 @@ function launchHeld(
 ) {
   const now = performance.now();
   const f = player.facing;
+  const power = 1 + (gameStore.get().level - 1) * 0.1;
   let count = 0;
 
   for (const e of props) {
@@ -174,7 +231,7 @@ function launchHeld(
       .normalize()
       .applyAxisAngle(up, MathUtils.randFloatSpread(launch.spread));
 
-    const speed = launch.speed / massFactor(e) ** 0.25;
+    const speed = (launch.speed * power) / massFactor(e) ** 0.25;
     e.body.setLinvel(
       {
         x: shot.x * speed + pv.x * 0.5,
@@ -196,6 +253,7 @@ function launchHeld(
 
   if (count === 0) return;
   gameStore.addLaunched(count);
+  emit("launch", { count, x: pp.x, y: pp.y, z: pp.z });
 
   // Small recoil sells the throw.
   const pb = player.body;
@@ -227,7 +285,9 @@ function FieldVisual() {
     if (!root.current.visible) return;
 
     const t = state.clock.elapsedTime;
+    const lvl = levelSpec();
     if (range.current) {
+      range.current.scale.setScalar(lvl.field / field.radius);
       range.current.rotation.z = t * 0.6;
       (range.current.material as MeshBasicMaterial).opacity = 0.8 * lv;
     }
@@ -235,13 +295,15 @@ function FieldVisual() {
       if (!wave) return;
       // Waves travel from the edge of the field toward the player.
       const phase = (t * 0.9 + i / waves.current.length) % 1;
-      wave.scale.setScalar(MathUtils.lerp(field.radius, 0.6, phase));
+      wave.scale.setScalar(MathUtils.lerp(lvl.field, lvl.radius + 0.3, phase));
       (wave.material as MeshBasicMaterial).opacity =
         Math.sin(phase * Math.PI) * 0.5 * lv;
     });
     if (aura.current) {
       aura.current.position.y = playerPos.y;
-      aura.current.scale.setScalar((1.1 + Math.sin(t * 10) * 0.08) * lv);
+      aura.current.scale.setScalar(
+        (lvl.radius * 2 + Math.sin(t * 10) * 0.08) * lv,
+      );
       (aura.current.material as MeshBasicMaterial).opacity = 0.22 * lv;
     }
   });

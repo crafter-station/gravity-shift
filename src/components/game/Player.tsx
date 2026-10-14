@@ -3,32 +3,38 @@
 import { useFrame, useThree } from "@react-three/fiber";
 import {
   BallCollider,
+  type RapierCollider,
   type RapierRigidBody,
   RigidBody,
   useBeforePhysicsStep,
 } from "@react-three/rapier";
 import { useEffect, useRef } from "react";
-import { type Group, MathUtils, type Mesh, Vector3 } from "three";
-import { CONFIG } from "@/game/config";
+import { type Group, MathUtils, Vector3 } from "three";
+import { CONFIG, LEVELS } from "@/game/config";
 import { getMoveVector } from "@/game/input";
 import { player } from "@/game/registry";
+import { gameStore } from "@/game/store";
 
 const forward = new Vector3();
 const right = new Vector3();
 const dir = new Vector3();
+const BASE_RADIUS = LEVELS[0].radius;
 
-/** The player orb: camera-relative rolling movement + facing indicator. */
+/** The player: camera-relative movement, growth per level and a facing arrow. */
 export function Player() {
   const body = useRef<RapierRigidBody>(null);
-  const group = useRef<Group>(null);
+  const collider = useRef<RapierCollider>(null);
+  const anchor = useRef<Group>(null);
+  const visual = useRef<Group>(null);
   const arrow = useRef<Group>(null);
   const camera = useThree((s) => s.camera);
-  const { radius, speed, accel } = CONFIG.player;
+  const { speed, accel } = CONFIG.player;
 
   useEffect(() => {
     player.body = body.current;
-    player.object = group.current;
+    player.object = anchor.current;
     player.facing.set(0, 0, -1);
+    player.radius = BASE_RADIUS;
     return () => {
       player.body = null;
       player.object = null;
@@ -39,6 +45,14 @@ export function Player() {
     const rb = body.current;
     if (!rb) return;
     const dt = world.timestep;
+    const level = gameStore.get().level;
+
+    // Grow smoothly toward the level's radius.
+    const target = LEVELS[level - 1].radius;
+    if (Math.abs(player.radius - target) > 0.001) {
+      player.radius = MathUtils.damp(player.radius, target, 6, dt);
+      collider.current?.setRadius(player.radius);
+    }
 
     camera.getWorldDirection(forward);
     forward.y = 0;
@@ -48,13 +62,14 @@ export function Player() {
     const move = getMoveVector();
     dir.copy(right).multiplyScalar(move.x).addScaledVector(forward, move.y);
 
+    const topSpeed = speed * (1 + (level - 1) * 0.08);
     const v = rb.linvel();
     const k = 1 - Math.exp(-accel * dt);
     rb.setLinvel(
       {
-        x: v.x + (dir.x * speed - v.x) * k,
+        x: v.x + (dir.x * topSpeed - v.x) * k,
         y: v.y,
-        z: v.z + (dir.z * speed - v.z) * k,
+        z: v.z + (dir.z * topSpeed - v.z) * k,
       },
       true,
     );
@@ -70,11 +85,25 @@ export function Player() {
     }
   });
 
-  useFrame(() => {
-    if (!arrow.current || !group.current) return;
-    group.current.getWorldPosition(arrow.current.position);
-    arrow.current.position.y = 0.03;
-    arrow.current.rotation.y = Math.atan2(player.facing.x, player.facing.z);
+  useFrame((state) => {
+    if (!anchor.current || !visual.current || !arrow.current) return;
+    const scale = player.radius / BASE_RADIUS;
+    const yaw = Math.atan2(player.facing.x, player.facing.z);
+
+    // The visual follows the (interpolated) body but never rolls with it.
+    anchor.current.getWorldPosition(visual.current.position);
+    visual.current.position.y +=
+      Math.sin(state.clock.elapsedTime * 3) * 0.06 * scale;
+    visual.current.rotation.y = yaw;
+    visual.current.scale.setScalar(scale);
+
+    arrow.current.position.set(
+      visual.current.position.x,
+      0.03,
+      visual.current.position.z,
+    );
+    arrow.current.rotation.y = yaw;
+    arrow.current.scale.setScalar(scale);
   });
 
   return (
@@ -87,13 +116,19 @@ export function Player() {
         linearDamping={0.5}
         angularDamping={0.6}
       >
-        <BallCollider args={[radius]} density={6} friction={1.2} />
-        <group ref={group}>
-          <PlayerOrb radius={radius} />
-        </group>
+        <BallCollider
+          ref={collider}
+          args={[BASE_RADIUS]}
+          density={6}
+          friction={1.2}
+        />
+        <group ref={anchor} />
       </RigidBody>
+      <group ref={visual}>
+        <PlayerOrb />
+      </group>
       <group ref={arrow}>
-        <mesh rotation-x={-Math.PI / 2} position-z={radius + 0.55}>
+        <mesh rotation-x={-Math.PI / 2} position-z={BASE_RADIUS + 0.55}>
           <circleGeometry args={[0.28, 3]} />
           <meshBasicMaterial color="#ffffff" transparent opacity={0.85} />
         </mesh>
@@ -102,16 +137,11 @@ export function Player() {
   );
 }
 
-function PlayerOrb({ radius }: { radius: number }) {
-  const core = useRef<Mesh>(null);
-  useFrame((state) => {
-    if (!core.current) return;
-    const s = 1 + Math.sin(state.clock.elapsedTime * 4) * 0.04;
-    core.current.scale.setScalar(MathUtils.lerp(core.current.scale.x, s, 0.2));
-  });
+/** Placeholder orb visual (radius BASE_RADIUS, centered). */
+function PlayerOrb() {
   return (
-    <mesh ref={core} castShadow>
-      <icosahedronGeometry args={[radius, 1]} />
+    <mesh castShadow>
+      <icosahedronGeometry args={[BASE_RADIUS, 1]} />
       <meshStandardMaterial
         color="#7c4dff"
         emissive="#5b2bff"

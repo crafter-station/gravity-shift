@@ -38,7 +38,14 @@ export type PropEntry = {
   broken: boolean;
 };
 
+/** Props still in play (grabbable). Broken props are removed from here. */
 export const props = new Set<PropEntry>();
+
+/** Every prop mounted this round, broken or not (destruction meter denominator). */
+export const allProps = new Set<PropEntry>();
+
+/** Lookup from rigid body handle, used to resolve the other side of a collision. */
+export const propByHandle = new Map<number, PropEntry>();
 
 /** Player handles shared with the gravity field, camera and effects. */
 export const player = {
@@ -46,4 +53,6 @@ export const player = {
   object: null as Object3D | null,
   /** Normalized XZ direction the player is facing (launch direction). */
   facing: new Vector3(0, 0, -1),
+  /** Current (animated) collider radius; grows with level. */
+  radius: 0.55,
 };

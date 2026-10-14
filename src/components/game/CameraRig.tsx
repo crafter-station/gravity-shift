@@ -2,7 +2,7 @@
 
 import { useFrame } from "@react-three/fiber";
 import { Vector3 } from "three";
-import { CONFIG } from "@/game/config";
+import { CONFIG, LEVELS } from "@/game/config";
 import { shake } from "@/game/effects";
 import { player } from "@/game/registry";
 
@@ -24,7 +24,9 @@ export function CameraRig() {
     // Pull back on portrait screens so the field still fits horizontally.
     const aspect = size.width / Math.max(size.height, 1);
     const zoom = aspect < 1 ? Math.min(1 / aspect, 1.8) ** 0.75 : 1;
-    desired.copy(target).addScaledVector(offset, zoom);
+    // Pull back as the orb grows so bigger levels see more of the plaza.
+    const growth = (player.radius / LEVELS[0].radius) ** 0.6;
+    desired.copy(target).addScaledVector(offset, zoom * growth);
     if (!initialized) {
       base.copy(camera.position);
       initialized = true;
