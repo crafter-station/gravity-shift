@@ -1,4 +1,5 @@
 import type { CollisionEnterPayload } from "@react-three/rapier";
+import { damage } from "./breakables";
 import { CONFIG } from "./config";
 import type { PropEntry, PropKind } from "./registry";
 
@@ -56,6 +57,7 @@ export function reportImpact(entry: PropEntry, payload: CollisionEnterPayload) {
 
   const projectile = now < entry.projectileUntil;
   const strength = Math.min(speed / 25, 1) * (projectile ? 1 : 0.7);
+  damage(entry, strength, projectile, payload.other.rigidBody?.handle);
   if (entry.held && strength < HELD_MIN_STRENGTH) return;
 
   entry.lastImpactAt = now;

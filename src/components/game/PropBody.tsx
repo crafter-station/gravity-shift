@@ -7,9 +7,10 @@ import {
 } from "@react-three/rapier";
 import { type ReactNode, useEffect, useRef } from "react";
 import { type Group, Vector3 } from "three";
+import { registerProp, unregisterProp } from "@/game/breakables";
 import { KINDS } from "@/game/config";
 import { reportImpact } from "@/game/effects";
-import { type PropEntry, type PropKind, props } from "@/game/registry";
+import type { PropEntry, PropKind } from "@/game/registry";
 
 type PropBodyProps = {
   kind: PropKind;
@@ -68,9 +69,10 @@ export function PropBody({
       broken: false,
     };
     entry.current = e;
-    props.add(e);
+    const handle = e.body.handle;
+    registerProp(e);
     return () => {
-      props.delete(e);
+      unregisterProp(e, handle);
       entry.current = null;
     };
   }, []);
