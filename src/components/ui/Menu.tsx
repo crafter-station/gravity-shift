@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { CONFIG } from "@/game/config";
 import { initScoring, lastRound, startGame } from "@/game/score";
 import { useGameStore } from "@/game/store";
 
@@ -18,7 +17,7 @@ export function Menu() {
     initScoring();
   }, []);
 
-  if (phase === "playing") return null;
+  if (phase === "playing" || phase === "upgrade") return null;
   return (
     <div
       className="absolute inset-0 grid place-items-center bg-sky-900/30 p-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] backdrop-blur-[2px]"
@@ -37,8 +36,8 @@ function StartScreen() {
         Gravity Shift
       </h1>
       <p className="mt-2 text-sm font-bold text-slate-600">
-        Pull. Orbit. Fling. Wreck the plaza in {CONFIG.game.durationSec}{" "}
-        seconds.
+        Invaders are marching on the plaza core. Grab anything — fling it at
+        them. Survive 10 waves.
       </p>
       <button type="button" className={`${PLAY_BTN} mt-5`} onClick={startGame}>
         Play
@@ -61,23 +60,23 @@ function StartScreen() {
   );
 }
 
-function stars(destruction: number) {
-  return destruction >= 0.75
-    ? 3
-    : destruction >= 0.45
-      ? 2
-      : destruction >= 0.2
-        ? 1
-        : 0;
+function stars(victory: boolean, hpRatio: number) {
+  if (!victory) return 0;
+  return hpRatio >= 0.7 ? 3 : hpRatio >= 0.35 ? 2 : 1;
 }
 
 function ResultsScreen() {
   const score = useGameStore((s) => s.score);
-  const destruction = useGameStore((s) => s.destruction);
   const level = useGameStore((s) => s.level);
-  const launched = useGameStore((s) => s.launched);
+  const kills = useGameStore((s) => s.kills);
+  const wave = useGameStore((s) => s.wave);
+  const totalWaves = useGameStore((s) => s.totalWaves);
+  const coreHp = useGameStore((s) => s.coreHp);
+  const coreMaxHp = useGameStore((s) => s.coreMaxHp);
+  const result = useGameStore((s) => s.result);
   const [shown, setShown] = useState(0);
   const isBest = lastRound.best;
+  const victory = result === "victory";
 
   useEffect(() => {
     const start = performance.now();
@@ -92,13 +91,18 @@ function ResultsScreen() {
     return () => cancelAnimationFrame(raf);
   }, [score]);
 
-  const earned = stars(destruction);
+  const earned = stars(victory, coreHp / coreMaxHp);
+  const survived = victory ? totalWaves : Math.max(0, wave - 1);
   return (
     <div className={PANEL}>
-      <h2 className="text-lg font-black tracking-widest text-slate-500 uppercase">
-        Time's up
+      <h2
+        className={`text-5xl font-black tracking-tight drop-shadow-[0_3px_0_rgba(255,255,255,0.9)] ${
+          victory ? "text-amber-500" : "text-red-600"
+        }`}
+      >
+        {victory ? "VICTORY" : "DEFEAT"}
       </h2>
-      <div className="mt-1 text-6xl leading-none font-black text-brand tabular-nums">
+      <div className="mt-2 text-6xl leading-none font-black text-brand tabular-nums">
         {shown}
       </div>
       {isBest ? (
@@ -122,9 +126,9 @@ function ResultsScreen() {
       </div>
       <dl className="mt-4 grid grid-cols-3 gap-2 text-center">
         {[
-          ["Wrecked", `${Math.round(destruction * 100)}%`],
+          ["Waves", `${survived}/${totalWaves}`],
+          ["Kills", String(kills)],
           ["Level", `LV ${level}`],
-          ["Launched", String(launched)],
         ].map(([label, value]) => (
           <div key={label} className="rounded-2xl bg-slate-100 px-2 py-2">
             <dd className="text-lg font-black tabular-nums">{value}</dd>
