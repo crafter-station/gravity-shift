@@ -130,7 +130,7 @@ export function Juice() {
       if (gameStore.get().frozen) gameStore.set({ frozen: false });
     };
 
-    const hitstop = () => {
+    const hitstop = (ms = HITSTOP_MS) => {
       const now = performance.now();
       if (st.hitstopTimer || now - st.lastHitstop < HITSTOP_MIN_GAP_MS) return;
       st.lastHitstop = now;
@@ -138,7 +138,7 @@ export function Juice() {
       st.hitstopTimer = setTimeout(() => {
         st.hitstopTimer = null;
         gameStore.set({ frozen: false });
-      }, HITSTOP_MS);
+      }, ms);
     };
 
     const offs = [
@@ -147,6 +147,12 @@ export function Juice() {
       }),
       on("break", (e) => {
         if (HEAVY.has(e.kind)) hitstop();
+      }),
+      on("enemyKilled", ({ kind }) => {
+        if (kind === "boss") {
+          hitstop(140);
+          addShake(0.9);
+        } else if (kind === "brute") hitstop(50);
       }),
       on("launch", ({ count }) => {
         st.punch = Math.max(st.punch, Math.min(4, 1.5 + count * 0.5));

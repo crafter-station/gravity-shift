@@ -22,12 +22,27 @@ export function AudioSystem() {
       on("points", () => audio.pointsTick()),
       on("levelUp", audio.levelUp),
       on("tooHeavy", audio.tooHeavy),
-      on("gameStart", audio.gameStart),
-      on("gameEnd", ({ best }) => audio.gameEnd(best)),
+      on("gameStart", () => {
+        audio.stopHeartbeat();
+        audio.gameStart();
+      }),
+      on("gameEnd", ({ victory, best }) => {
+        audio.stopHeartbeat();
+        audio.gameEnd(victory, best);
+      }),
+      on("waveStart", ({ boss }) => audio.waveStart(boss)),
+      on("waveCleared", () => audio.waveCleared()),
+      on("upgradePicked", () => audio.upgradePicked()),
+      on("supplyDrop", ({ count }) => audio.supplyDrop(count)),
+      on("enemySpawn", () => audio.enemySpawn()),
+      on("enemyHit", ({ kind, damage }) => audio.enemyHit(kind, damage)),
+      on("enemyKilled", ({ kind }) => audio.enemyKilled(kind)),
+      on("coreHit", ({ hp }) => audio.coreHit(hp)),
     ];
     return () => {
       for (const off of offs) off();
       audio.attractEnd();
+      audio.stopHeartbeat();
     };
   }, []);
 
