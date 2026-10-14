@@ -1,3 +1,5 @@
+import type { EnemyKind } from "./registry";
+
 /** Typed game-wide event bus. Systems emit, audio / UI / juice listen. */
 export type GameEvents = {
   /** Gravity field turned on / off. */
@@ -22,7 +24,32 @@ export type GameEvents = {
   /** Combo counter changed (>= 2). */
   combo: { count: number };
   gameStart: Record<string, never>;
-  gameEnd: { score: number; destruction: number; best: boolean };
+  gameEnd: { score: number; wave: number; victory: boolean; best: boolean };
+  /** Defense mode. */
+  waveStart: { wave: number; boss: boolean };
+  waveCleared: { wave: number };
+  enemySpawn: { kind: EnemyKind; x: number; y: number; z: number };
+  /** An enemy took damage (killed = this hit finished it). */
+  enemyHit: {
+    kind: EnemyKind;
+    damage: number;
+    killed: boolean;
+    x: number;
+    y: number;
+    z: number;
+  };
+  enemyKilled: {
+    kind: EnemyKind;
+    points: number;
+    x: number;
+    y: number;
+    z: number;
+  };
+  /** An enemy reached the core. */
+  coreHit: { damage: number; hp: number; x: number; y: number; z: number };
+  upgradePicked: { id: string };
+  /** Crates fall from the sky between waves. */
+  supplyDrop: { count: number };
 };
 
 type Listener<K extends keyof GameEvents> = (payload: GameEvents[K]) => void;

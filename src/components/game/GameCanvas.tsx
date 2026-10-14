@@ -8,7 +8,10 @@ import { useGameStore } from "@/game/store";
 import { Breakables } from "./Breakables";
 import { Buildings } from "./Buildings";
 import { CameraRig } from "./CameraRig";
+import { Core } from "./Core";
 import { Effects } from "./Effects";
+import { Enemies } from "./Enemies";
+import { EnemyIndicators } from "./EnemyIndicators";
 import { GameDirector } from "./GameDirector";
 import { GravityField } from "./GravityField";
 import { Juice } from "./Juice";
@@ -16,11 +19,12 @@ import { Player } from "./Player";
 import { Props } from "./Props";
 import { Scene } from "./Scene";
 import { Structures } from "./Structures";
+import { Supplies } from "./Supplies";
 
 /** Client-only 3D game: canvas, physics world and every 3D system. */
 export default function GameCanvas() {
   const resetKey = useGameStore((s) => s.resetKey);
-  const frozen = useGameStore((s) => s.frozen);
+  const paused = useGameStore((s) => s.frozen || s.phase === "upgrade");
   useGlobalControls();
 
   return (
@@ -40,12 +44,15 @@ export default function GameCanvas() {
           key={resetKey}
           timeStep={1 / 60}
           gravity={[0, -20, 0]}
-          paused={frozen}
+          paused={paused}
         >
           <Scene />
           <Props />
           <Structures />
           <Breakables />
+          <Core />
+          <Enemies />
+          <Supplies />
           <Player />
           <GravityField />
         </Physics>
@@ -56,6 +63,7 @@ export default function GameCanvas() {
         <Effects />
         <Juice />
         <GameDirector />
+        <EnemyIndicators />
       </Suspense>
     </Canvas>
   );

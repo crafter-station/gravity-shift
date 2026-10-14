@@ -2,10 +2,12 @@
 
 import dynamic from "next/dynamic";
 import { AudioSystem } from "./AudioSystem";
+import { EnemyIndicatorLayer } from "./ui/EnemyIndicatorLayer";
 import { Hud } from "./ui/Hud";
 import { Menu } from "./ui/Menu";
 import { ScorePopups } from "./ui/ScorePopups";
 import { TouchControls } from "./ui/TouchControls";
+import { UpgradePicker } from "./ui/UpgradePicker";
 
 const GameCanvas = dynamic(() => import("./game/GameCanvas"), {
   ssr: false,
@@ -32,9 +34,11 @@ export function GameRoot() {
   return (
     <main className="fixed inset-0 touch-none select-none overflow-hidden overscroll-none bg-sky-200">
       <GameCanvas />
+      <EnemyIndicatorLayer />
       <ScorePopups />
       <Hud />
       <TouchControls />
+      <UpgradePicker />
       <Menu />
       <AudioSystem />
     </main>

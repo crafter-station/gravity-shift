@@ -2,7 +2,8 @@
 
 import { useSyncExternalStore } from "react";
 
-export type GamePhase = "menu" | "playing" | "results";
+/** menu → playing ⇄ upgrade (pick 1 of 3 between waves) → results. */
+export type GamePhase = "menu" | "playing" | "upgrade" | "results";
 
 /** Tiny external store for state the UI needs. The 3D loop writes, React reads. */
 export type GameState = {
@@ -15,8 +16,21 @@ export type GameState = {
   score: number;
   best: number;
   combo: number;
-  /** Seconds left in the current round. */
-  timeLeft: number;
+  /** Current wave (1-based) out of totalWaves. */
+  wave: number;
+  totalWaves: number;
+  /** Enemies still to defeat this wave (alive + not yet spawned). */
+  enemiesLeft: number;
+  kills: number;
+  /** Plaza core health; reaching 0 loses the run. */
+  coreHp: number;
+  coreMaxHp: number;
+  /** Upgrade ids offered while phase === "upgrade". */
+  upgradeChoices: string[];
+  /** Picked upgrade stacks by id. */
+  upgrades: Record<string, number>;
+  /** Outcome once phase === "results". */
+  result: "victory" | "defeat" | null;
   /** 1-based player level and XP (XP = points earned this round). */
   level: number;
   xp: number;
@@ -33,7 +47,15 @@ const initialRound = {
   attracting: false,
   score: 0,
   combo: 0,
-  timeLeft: 0,
+  wave: 0,
+  totalWaves: 10,
+  enemiesLeft: 0,
+  kills: 0,
+  coreHp: 100,
+  coreMaxHp: 100,
+  upgradeChoices: [] as string[],
+  upgrades: {} as Record<string, number>,
+  result: null,
   level: 1,
   xp: 0,
   destruction: 0,

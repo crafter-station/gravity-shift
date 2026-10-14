@@ -25,7 +25,7 @@ export function Hud() {
 function HudInner() {
   const score = useGameStore((s) => s.score);
   const combo = useGameStore((s) => s.combo);
-  const timeLeft = useGameStore((s) => s.timeLeft);
+  const timeLeft = useGameStore((s) => s.enemiesLeft);
   const level = useGameStore((s) => s.level);
   const xp = useGameStore((s) => s.xp);
   const destruction = useGameStore((s) => s.destruction);

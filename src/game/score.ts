@@ -1,21 +1,18 @@
-import { CONFIG } from "./config";
-import { onImpact } from "./effects";
 import { emit, on } from "./events";
 import { input } from "./input";
 import { addXp } from "./progression";
 import { gameStore } from "./store";
+import { setRunEndHandler, startRun, tickWaves } from "./waves";
 
 const BEST_KEY = "gravity-shift:best";
 const COMBO_WINDOW_MS = 1200;
 const MAX_MULT = 4;
 
-/** Precise round clock (the store copy is throttled). */
-const round = { timeLeft: 0, storeAt: 0 };
 let comboCount = 0;
 let lastHitAt = 0;
 let initialized = false;
 
-/** Outcome of the last finished round, read by the results screen. */
+/** Outcome of the last finished run, read by the results screen. */
 export const lastRound = { best: false };
 
 /** Combo multiplier for a combo count: 1 + 0.25 × (n − 1), capped at ×4. */
@@ -108,40 +105,37 @@ function award(base: number, x: number, y: number, z: number) {
   if (comboCount >= 2) emit("combo", { count: comboCount });
 }
 
-/** Subscribes scoring to impact / break events once. Safe to call repeatedly. */
+/** Subscribes scoring to invader events once. Safe to call repeatedly. */
 export function initScoring() {
   if (initialized || typeof window === "undefined") return;
   initialized = true;
   if (gameStore.get().phase === "menu") input.enabled = false;
   gameStore.set({ best: readBest() });
+  setRunEndHandler(endGame);
 
-  onImpact((e) => {
-    if (gameStore.get().phase !== "playing" || !e.projectile) return;
-    award(e.points * (0.5 + e.strength), e.x, e.y, e.z);
-  });
-  on("break", (e) => {
+  // Kills are the main source of points; chaining kills builds the combo.
+  on("enemyKilled", (e) => {
     if (gameStore.get().phase !== "playing") return;
-    award(e.points * 2, e.x, e.y, e.z);
+    award(e.points, e.x, e.y + 1, e.z);
   });
 }
 
-/** Starts (or restarts) a timed round. */
+/** Starts (or restarts) a defense run from wave 1. */
 export function startGame() {
   initScoring();
   gameStore.reset();
   comboCount = 0;
   lastHitAt = 0;
   lastRound.best = false;
-  round.timeLeft = CONFIG.game.durationSec;
-  round.storeAt = 0;
   for (const p of popupSlots) p.active = false;
   input.enabled = true;
-  gameStore.set({ phase: "playing", timeLeft: CONFIG.game.durationSec });
+  gameStore.set({ phase: "playing" });
   emit("gameStart", {});
+  startRun();
 }
 
-/** Ends the round: persists best, shows results. */
-export function endGame() {
+/** Ends the run (core destroyed or last wave cleared): persists best, shows results. */
+export function endGame(victory: boolean) {
   const s = gameStore.get();
   if (s.phase !== "playing") return;
   input.enabled = false;
@@ -150,19 +144,15 @@ export function endGame() {
   if (isBest) writeBest(s.score);
   gameStore.set({
     phase: "results",
-    timeLeft: 0,
+    result: victory ? "victory" : "defeat",
     combo: 0,
     attracting: false,
     best: isBest ? s.score : s.best,
   });
-  emit("gameEnd", {
-    score: s.score,
-    destruction: s.destruction,
-    best: isBest,
-  });
+  emit("gameEnd", { score: s.score, wave: s.wave, victory, best: isBest });
 }
 
-/** Advances the round clock and combo decay; call every frame with delta seconds. */
+/** Advances waves and combo decay; call every frame with delta seconds. */
 export function tickRound(dt: number) {
   if (gameStore.get().phase !== "playing") return;
   const now = performance.now();
@@ -170,13 +160,5 @@ export function tickRound(dt: number) {
     comboCount = 0;
     gameStore.set({ combo: 0 });
   }
-  round.timeLeft = Math.max(0, round.timeLeft - Math.min(dt, 0.1));
-  if (round.timeLeft <= 0) {
-    endGame();
-    return;
-  }
-  if (now - round.storeAt >= 100) {
-    round.storeAt = now;
-    gameStore.set({ timeLeft: round.timeLeft });
-  }
+  tickWaves(dt);
 }

@@ -56,3 +56,25 @@ export const player = {
   /** Current (animated) collider radius; grows with level. */
   radius: 0.55,
 };
+
+export type EnemyKind = "minion" | "runner" | "brute" | "boss";
+
+/** Runtime data for a live invader. */
+export type EnemyEntry = {
+  id: number;
+  body: RapierRigidBody;
+  /** Interpolated transform group (for UI projection / effects). */
+  object: Object3D;
+  kind: EnemyKind;
+  hp: number;
+  maxHp: number;
+  radius: number;
+  /** Knocked back: no steering until performance.now() passes this. */
+  stunUntil: number;
+};
+
+/** Live (not yet defeated) enemies. */
+export const enemies = new Set<EnemyEntry>();
+
+/** The plaza core everybody is fighting over. */
+export const core = { x: 0, z: 0, radius: 1.4 };
