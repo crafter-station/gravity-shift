@@ -5,16 +5,22 @@ import { Physics } from "@react-three/rapier";
 import { Suspense } from "react";
 import { input, useGlobalControls } from "@/game/input";
 import { useGameStore } from "@/game/store";
+import { Breakables } from "./Breakables";
+import { Buildings } from "./Buildings";
 import { CameraRig } from "./CameraRig";
 import { Effects } from "./Effects";
+import { GameDirector } from "./GameDirector";
 import { GravityField } from "./GravityField";
+import { Juice } from "./Juice";
 import { Player } from "./Player";
 import { Props } from "./Props";
 import { Scene } from "./Scene";
+import { Structures } from "./Structures";
 
 /** Client-only 3D game: canvas, physics world and every 3D system. */
 export default function GameCanvas() {
   const resetKey = useGameStore((s) => s.resetKey);
+  const frozen = useGameStore((s) => s.frozen);
   useGlobalControls();
 
   return (
@@ -30,14 +36,26 @@ export default function GameCanvas() {
       onContextMenu={(e) => e.preventDefault()}
     >
       <Suspense fallback={null}>
-        <Physics key={resetKey} timeStep={1 / 60} gravity={[0, -20, 0]}>
+        <Physics
+          key={resetKey}
+          timeStep={1 / 60}
+          gravity={[0, -20, 0]}
+          paused={frozen}
+        >
           <Scene />
           <Props />
+          <Structures />
+          <Breakables />
           <Player />
           <GravityField />
         </Physics>
+        <Suspense fallback={null}>
+          <Buildings />
+        </Suspense>
         <CameraRig />
         <Effects />
+        <Juice />
+        <GameDirector />
       </Suspense>
     </Canvas>
   );

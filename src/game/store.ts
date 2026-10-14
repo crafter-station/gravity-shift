@@ -2,15 +2,51 @@
 
 import { useSyncExternalStore } from "react";
 
-/** Tiny external store for state the HUD needs. The 3D loop writes, React reads. */
+export type GamePhase = "menu" | "playing" | "results";
+
+/** Tiny external store for state the UI needs. The 3D loop writes, React reads. */
 export type GameState = {
+  phase: GamePhase;
   launched: number;
   held: number;
   attracting: boolean;
+  /** Incremented to remount (reset) the physics world. */
   resetKey: number;
+  score: number;
+  best: number;
+  combo: number;
+  /** Seconds left in the current round. */
+  timeLeft: number;
+  /** 1-based player level and XP (XP = points earned this round). */
+  level: number;
+  xp: number;
+  /** 0..1 share of the plaza wrecked. */
+  destruction: number;
+  muted: boolean;
+  /** Physics paused for hitstop. */
+  frozen: boolean;
 };
 
-let state: GameState = { launched: 0, held: 0, attracting: false, resetKey: 0 };
+const initialRound = {
+  launched: 0,
+  held: 0,
+  attracting: false,
+  score: 0,
+  combo: 0,
+  timeLeft: 0,
+  level: 1,
+  xp: 0,
+  destruction: 0,
+  frozen: false,
+} satisfies Partial<GameState>;
+
+let state: GameState = {
+  ...initialRound,
+  phase: "menu",
+  resetKey: 0,
+  best: 0,
+  muted: false,
+};
 const listeners = new Set<() => void>();
 
 function set(patch: Partial<GameState>) {
@@ -25,6 +61,7 @@ function set(patch: Partial<GameState>) {
 
 export const gameStore = {
   get: () => state,
+  set,
   subscribe(listener: () => void) {
     listeners.add(listener);
     return () => listeners.delete(listener);
@@ -32,13 +69,8 @@ export const gameStore = {
   addLaunched: (n: number) => set({ launched: state.launched + n }),
   setHeld: (held: number) => set({ held }),
   setAttracting: (attracting: boolean) => set({ attracting }),
-  reset: () =>
-    set({
-      launched: 0,
-      held: 0,
-      attracting: false,
-      resetKey: state.resetKey + 1,
-    }),
+  /** Clears round stats and rebuilds the physics world. Phase is left untouched. */
+  reset: () => set({ ...initialRound, resetKey: state.resetKey + 1 }),
 };
 
 export function useGameStore<T>(selector: (s: GameState) => T): T {

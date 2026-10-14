@@ -7,6 +7,7 @@ import {
 } from "@react-three/rapier";
 import { type ReactNode, useEffect, useRef } from "react";
 import { type Group, Vector3 } from "three";
+import { KINDS } from "@/game/config";
 import { reportImpact } from "@/game/effects";
 import { type PropEntry, type PropKind, props } from "@/game/registry";
 
@@ -19,6 +20,10 @@ type PropBodyProps = {
   colliders?: RigidBodyProps["colliders"];
   /** Mass density multiplier (heavier props lag behind in the field). */
   density?: number;
+  /** Override the level tier needed to lift it (defaults to KINDS[kind].tier). */
+  tier?: number;
+  /** Override base points (defaults to KINDS[kind].points). */
+  points?: number;
   children: ReactNode;
 };
 
@@ -33,6 +38,8 @@ export function PropBody({
   rotation,
   colliders = "cuboid",
   density = 1,
+  tier,
+  points,
   children,
 }: PropBodyProps) {
   const body = useRef<RapierRigidBody>(null);
@@ -54,6 +61,11 @@ export function PropBody({
       orbitHeight: 0,
       projectileUntil: 0,
       lastImpactAt: 0,
+      tier: tier ?? KINDS[kind].tier,
+      points: points ?? KINDS[kind].points,
+      breakable: KINDS[kind].breakable,
+      wrecked: false,
+      broken: false,
     };
     entry.current = e;
     props.add(e);

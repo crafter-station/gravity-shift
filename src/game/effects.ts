@@ -1,6 +1,6 @@
 import type { CollisionEnterPayload } from "@react-three/rapier";
 import { CONFIG } from "./config";
-import type { PropEntry } from "./registry";
+import type { PropEntry, PropKind } from "./registry";
 
 /** Impact event consumed by the <Effects /> component. */
 export type ImpactEvent = {
@@ -12,6 +12,9 @@ export type ImpactEvent = {
   color: string;
   /** True when the hit prop is a launched projectile. */
   projectile: boolean;
+  /** Kind and base points of the prop reporting the hit. */
+  kind: PropKind;
+  points: number;
 };
 
 const listeners = new Set<(e: ImpactEvent) => void>();
@@ -73,7 +76,16 @@ export function reportImpact(entry: PropEntry, payload: CollisionEnterPayload) {
     z = p.z;
   }
 
-  emitImpact({ x, y, z, strength, color: entry.color, projectile });
+  emitImpact({
+    x,
+    y,
+    z,
+    strength,
+    color: entry.color,
+    projectile,
+    kind: entry.kind,
+    points: entry.points,
+  });
 
   if (projectile && strength > 0.4) addShake(strength * 0.45);
   else if (strength > 0.7) addShake(strength * 0.2);

@@ -7,6 +7,8 @@ import { useEffect } from "react";
  * Written by keyboard / mouse / touch controls, read every physics step.
  */
 export const input = {
+  /** False while menus/results are shown: movement and attraction are ignored. */
+  enabled: true,
   keyboard: { x: 0, y: 0 },
   joystick: { x: 0, y: 0 },
   attract: { mouse: false, key: false, touch: false },
@@ -51,6 +53,7 @@ function releaseAll() {
 
 /** Movement vector in screen space (x = right, y = forward), length <= 1. */
 export function getMoveVector() {
+  if (!input.enabled) return { x: 0, y: 0 };
   const x = input.keyboard.x + input.joystick.x;
   const y = input.keyboard.y + input.joystick.y;
   const len = Math.hypot(x, y);
@@ -58,6 +61,7 @@ export function getMoveVector() {
 }
 
 export function isAttracting() {
+  if (!input.enabled) return false;
   const { mouse, key, touch } = input.attract;
   return mouse || key || touch;
 }
