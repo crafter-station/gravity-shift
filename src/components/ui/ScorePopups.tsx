@@ -27,6 +27,9 @@ export function ScorePopups() {
   const bannerRef = useRef<HTMLDivElement>(null);
   const bannerTextRef = useRef<HTMLDivElement>(null);
   const toastRef = useRef<HTMLDivElement>(null);
+  const waveRef = useRef<HTMLDivElement>(null);
+  const waveTextRef = useRef<HTMLDivElement>(null);
+  const vignetteRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let raf = 0;
@@ -86,6 +89,44 @@ export function ScorePopups() {
         2300,
       );
     });
+    let waveTimer = 0;
+    const showWave = (text: string, boss: boolean, ms: number) => {
+      const box = waveRef.current;
+      const t = waveTextRef.current;
+      if (!box || !t) return;
+      t.textContent = text;
+      t.className = boss
+        ? "rounded-3xl bg-red-600 px-5 py-3 text-center text-3xl font-black text-white shadow-2xl ring-4 ring-white/80 sm:text-5xl"
+        : "text-center text-5xl font-black text-white [-webkit-text-stroke:6px_rgba(76,29,149,0.9)] [paint-order:stroke_fill] sm:text-7xl";
+      box.style.animationDuration = `${ms}ms`;
+      box.classList.remove("gs-banner");
+      void box.offsetWidth;
+      box.classList.add("gs-banner");
+      window.clearTimeout(waveTimer);
+      waveTimer = window.setTimeout(
+        () => box.classList.remove("gs-banner"),
+        ms + 100,
+      );
+    };
+    const offWave = on("waveStart", ({ wave, boss }) =>
+      showWave(boss ? "⚠ BOSS INCOMING ⚠" : `WAVE ${wave}`, boss, 1500),
+    );
+    const offCleared = on("waveCleared", () =>
+      showWave("WAVE CLEARED!", false, 1400),
+    );
+    let vignetteTimer = 0;
+    const offCore = on("coreHit", () => {
+      const el = vignetteRef.current;
+      if (!el) return;
+      el.style.transition = "none";
+      el.style.opacity = "1";
+      void el.offsetWidth;
+      el.style.transition = "opacity 500ms ease-out";
+      window.clearTimeout(vignetteTimer);
+      vignetteTimer = window.setTimeout(() => {
+        el.style.opacity = "0";
+      }, 30);
+    });
     const offHeavy = on("tooHeavy", ({ tier }) => {
       const now = performance.now();
       const toast = toastRef.current;
@@ -105,6 +146,11 @@ export function ScorePopups() {
       window.clearTimeout(toastTimer);
       offLevel();
       offHeavy();
+      offWave();
+      offCleared();
+      offCore();
+      window.clearTimeout(waveTimer);
+      window.clearTimeout(vignetteTimer);
     };
   }, []);
 
@@ -133,6 +179,16 @@ export function ScorePopups() {
           className="max-w-full rounded-3xl bg-brand px-5 py-3 text-center text-lg font-black text-white shadow-2xl ring-4 ring-white/80 sm:text-2xl"
         />
       </div>
+      <div
+        ref={waveRef}
+        className="absolute inset-x-0 top-[18%] flex justify-center px-4 opacity-0"
+      >
+        <div ref={waveTextRef} />
+      </div>
+      <div
+        ref={vignetteRef}
+        className="absolute inset-0 opacity-0 shadow-[inset_0_0_120px_40px_rgba(220,38,38,0.75)]"
+      />
       <div
         ref={toastRef}
         className="absolute inset-x-0 top-[40%] mx-auto w-fit rounded-full bg-slate-900/75 px-4 py-1.5 text-sm font-extrabold text-white opacity-0 transition-opacity"
