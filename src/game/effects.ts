@@ -1,4 +1,5 @@
 import type { CollisionEnterPayload } from "@react-three/rapier";
+import { CONFIG } from "./config";
 import type { PropEntry } from "./registry";
 
 /** Impact event consumed by the <Effects /> component. */
@@ -9,6 +10,8 @@ export type ImpactEvent = {
   /** 0..1 normalized impact strength. */
   strength: number;
   color: string;
+  /** True when the hit prop is a launched projectile. */
+  projectile: boolean;
 };
 
 const listeners = new Set<(e: ImpactEvent) => void>();
@@ -24,19 +27,54 @@ export function emitImpact(event: ImpactEvent) {
   for (const l of listeners) l(event);
 }
 
+/** Camera shake trauma (0..1), decayed and consumed by <CameraRig />. */
+export const shake = { trauma: 0 };
+
+/** Adds camera shake trauma (0..1), clamped. */
+export function addShake(amount: number) {
+  shake.trauma = Math.min(1, shake.trauma + amount);
+}
+
+/** Strength above which held props still produce effects. */
+const HELD_MIN_STRENGTH = 0.8;
+
 /** Called by every prop on collision enter. Decides whether the hit is worth an effect. */
 export function reportImpact(entry: PropEntry, payload: CollisionEnterPayload) {
-  // TODO(effects): refine thresholds, use contact point from payload.manifold.
-  void payload;
+  const now = performance.now();
+  if (now - entry.lastImpactAt < CONFIG.impact.cooldownMs) return;
+
   const v = entry.body.linvel();
-  const speed = Math.hypot(v.x, v.y, v.z);
-  if (speed < 5) return;
-  const p = entry.body.translation();
-  emitImpact({
-    x: p.x,
-    y: p.y,
-    z: p.z,
-    strength: Math.min(speed / 25, 1),
-    color: entry.color,
-  });
+  const o = payload.other.rigidBody?.linvel();
+  const rx = v.x - (o?.x ?? 0);
+  const ry = v.y - (o?.y ?? 0);
+  const rz = v.z - (o?.z ?? 0);
+  const speed = Math.hypot(rx, ry, rz);
+  if (speed < CONFIG.impact.minSpeed) return;
+
+  const projectile = now < entry.projectileUntil;
+  const strength = Math.min(speed / 25, 1) * (projectile ? 1 : 0.7);
+  if (entry.held && strength < HELD_MIN_STRENGTH) return;
+
+  entry.lastImpactAt = now;
+
+  let x: number;
+  let y: number;
+  let z: number;
+  const m = payload.manifold;
+  if (m.numSolverContacts() > 0) {
+    const c = m.solverContactPoint(0);
+    x = c.x;
+    y = c.y;
+    z = c.z;
+  } else {
+    const p = entry.body.translation();
+    x = p.x;
+    y = p.y;
+    z = p.z;
+  }
+
+  emitImpact({ x, y, z, strength, color: entry.color, projectile });
+
+  if (projectile && strength > 0.4) addShake(strength * 0.45);
+  else if (strength > 0.7) addShake(strength * 0.2);
 }
