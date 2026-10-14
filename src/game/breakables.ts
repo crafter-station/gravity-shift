@@ -1,10 +1,13 @@
 import { Box3, Vector3 } from "three";
+import { enemyByHandle } from "./combat";
 import { emit } from "./events";
 import { allProps, type PropEntry, propByHandle, props } from "./registry";
 import { gameStore } from "./store";
 
 /** Impact strength (0..1) needed to shatter a breakable prop hit by/with a projectile. */
 const BREAK_STRENGTH = 0.5;
+/** Odds a breakable prop shatters on a qualifying hit (keeps ammo around). */
+const SHATTER_CHANCE = 0.45;
 /** Impact strength that counts a sturdy prop as wrecked. */
 const WRECK_STRENGTH = 0.35;
 
@@ -74,8 +77,18 @@ export function damage(
     : false;
   if (!projectile && !otherProjectile) return;
 
-  if (entry.breakable && strength >= BREAK_STRENGTH) shatter(entry);
-  else if (strength >= WRECK_STRENGTH) markWrecked(entry);
+  // Ground and static scenery never shatter props: thrown ammo can be reused.
+  const hitEnemy = otherHandle !== undefined && enemyByHandle.has(otherHandle);
+  const hitProp = other !== undefined;
+  if (
+    entry.breakable &&
+    strength >= BREAK_STRENGTH &&
+    (hitEnemy || hitProp) &&
+    // Husks are bonus ammo and always burst; regular props survive half the time.
+    (entry.kind === "husk" || Math.random() < SHATTER_CHANCE)
+  ) {
+    shatter(entry);
+  } else if (strength >= WRECK_STRENGTH) markWrecked(entry);
 }
 
 /** Removes the prop from play and asks <Breakables /> to spawn its debris. */

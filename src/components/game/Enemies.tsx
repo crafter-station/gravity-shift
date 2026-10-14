@@ -238,12 +238,20 @@ const Enemy = memo(function Enemy({
     if (Math.hypot(vel.x, vel.z) < stats.speed * 0.25) {
       stuck.current += 1 / 60;
       if (stuck.current > 0.5 && now > detourUntil.current) {
-        detourUntil.current = now + 1200;
+        // Second time stuck in a row: hop over whatever blocks the way.
+        if (now - detourUntil.current < 800 && Math.abs(vel.y) < 0.5) {
+          const m = rb.mass();
+          rb.applyImpulse(
+            { x: toCore.x * 2 * m, y: 7 * m, z: toCore.z * 2 * m },
+            true,
+          );
+        }
+        detourUntil.current = now + 1000;
         detourSide.current = Math.random() < 0.5 ? -1 : 1;
         stuck.current = 0;
       }
     } else stuck.current = Math.max(0, stuck.current - 1 / 60);
-    if (now < detourUntil.current) side = detourSide.current * 1.6;
+    if (now < detourUntil.current) side = detourSide.current * 2.2;
     const dx = toCore.x - toCore.z * side;
     const dz = toCore.z + toCore.x * side;
     const len = Math.hypot(dx, dz) || 1;
