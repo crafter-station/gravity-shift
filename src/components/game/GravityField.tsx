@@ -11,11 +11,20 @@ import {
   type MeshBasicMaterial,
   Vector3,
 } from "three";
+import { damageEnemy } from "@/game/combat";
 import { CONFIG, LEVELS } from "@/game/config";
+import { emitImpact } from "@/game/effects";
 import { emit } from "@/game/events";
 import { isAttracting } from "@/game/input";
-import { type PropEntry, player, props } from "@/game/registry";
+import {
+  type EnemyEntry,
+  enemies,
+  type PropEntry,
+  player,
+  props,
+} from "@/game/registry";
 import { gameStore } from "@/game/store";
+import { stacks } from "@/game/upgrades";
 
 const { field, launch } = CONFIG;
 const toAim = new Vector3();
@@ -29,7 +38,14 @@ let lastTooHeavy = 0;
 
 /** Current level stats (orb size, field reach, capacity, liftable tier). */
 function levelSpec() {
-  return LEVELS[gameStore.get().level - 1];
+  const { level, upgrades } = gameStore.get();
+  const base = LEVELS[level - 1];
+  const reach = stacks(upgrades, "reach");
+  return {
+    ...base,
+    field: base.field * 1.25 ** reach,
+    maxHeld: base.maxHeld + reach * 4,
+  };
 }
 
 /** Orbit scale grows with the orb so bigger levels make wider, grander orbits. */
@@ -91,10 +107,13 @@ export function GravityField() {
       else {
         emit("attractEnd", {});
         launchHeld(pp, pv);
+        releasePulse(pp);
       }
     }
     wasAttracting.current = attracting;
     const lvl = levelSpec();
+    const spinBoost = 1.5 ** stacks(gameStore.get().upgrades, "spin");
+    steerProjectiles(dt);
 
     let held = 0;
     for (const e of props) if (e.held) held++;
@@ -140,7 +159,8 @@ export function GravityField() {
       // Closer to the center → stronger pull.
       const closeness = 1 - MathUtils.clamp(dist / lvl.field, 0, 1);
       const pull =
-        (field.steer * (0.3 + 0.7 * closeness)) / Math.sqrt(massFactor(e));
+        (field.steer * spinBoost * (0.3 + 0.7 * closeness)) /
+        Math.sqrt(massFactor(e));
       const k = 1 - Math.exp(-pull * dt);
 
       let vx = (tx - p.x) * 4 + pv.x;
@@ -205,6 +225,91 @@ function tooHeavy(
   emit("tooHeavy", { x: p.x, y: p.y, z: p.z, tier: e.tier });
 }
 
+const GRAVITY = 20;
+/** Max distance for auto-aim, and the cone half-angle cosine (≈60°). */
+const AIM_RANGE = 30;
+const AIM_CONE = 0.5;
+/** Invaders this close are always valid targets, whatever the facing. */
+const AIM_CLOSE = 7;
+
+/** Up to 3 invaders to spread a volley over, best (close + in front) first. */
+function pickTargets(pp: { x: number; z: number }, f: Vector3): EnemyEntry[] {
+  const scored: { e: EnemyEntry; score: number }[] = [];
+  for (const e of enemies) {
+    const p = e.body.translation();
+    const dx = p.x - pp.x;
+    const dz = p.z - pp.z;
+    const d = Math.hypot(dx, dz) || 0.001;
+    if (d > AIM_RANGE) continue;
+    const cos = (dx * f.x + dz * f.z) / d;
+    if (cos < AIM_CONE && d > AIM_CLOSE) continue;
+    // Bosses and brutes soak more, so they attract more of the volley.
+    const weight = e.kind === "boss" ? 0.6 : e.kind === "brute" ? 0.8 : 1;
+    scored.push({ e, score: d * (1.6 - cos) * weight });
+  }
+  scored.sort((a, b) => a.score - b.score);
+  return scored.slice(0, 3).map((s) => s.e);
+}
+
+/** Gravity Lock upgrade: launched props curve toward their target. */
+function steerProjectiles(dt: number) {
+  const n = stacks(gameStore.get().upgrades, "homing");
+  if (n === 0) return;
+  const now = performance.now();
+  const k = 1 - Math.exp(-2.5 * n * dt);
+  for (const e of props) {
+    const target = e.target;
+    if (!target || now > e.projectileUntil || !enemies.has(target)) continue;
+    const p = e.body.translation();
+    const tp = target.body.translation();
+    const v = e.body.linvel();
+    const speed = Math.hypot(v.x, v.y, v.z);
+    const dx = tp.x - p.x;
+    const dy = tp.y - p.y;
+    const dz = tp.z - p.z;
+    const d = Math.hypot(dx, dy, dz) || 1;
+    e.body.setLinvel(
+      {
+        x: v.x + ((dx / d) * speed - v.x) * k,
+        y: v.y + ((dy / d) * speed - v.y) * k,
+        z: v.z + ((dz / d) * speed - v.z) * k,
+      },
+      true,
+    );
+  }
+}
+
+/** Release Pulse upgrade: letting go blasts nearby invaders away. */
+function releasePulse(pp: { x: number; y: number; z: number }) {
+  const n = stacks(gameStore.get().upgrades, "shockwave");
+  if (n === 0) return;
+  const radius = 4 + n * 1.5;
+  emitImpact({
+    x: pp.x,
+    y: 0.3,
+    z: pp.z,
+    strength: 1,
+    color: "#b388ff",
+    projectile: true,
+    kind: "husk",
+    points: 0,
+  });
+  for (const e of [...enemies]) {
+    const p = e.body.translation();
+    const dx = p.x - pp.x;
+    const dz = p.z - pp.z;
+    const d = Math.hypot(dx, dz) || 0.001;
+    if (d > radius + e.radius) continue;
+    const m = e.body.mass();
+    const push = (1 - (d / (radius + e.radius)) * 0.5) * (6 + n * 3) * m;
+    e.body.applyImpulse(
+      { x: (dx / d) * push, y: m * 3, z: (dz / d) * push },
+      true,
+    );
+    damageEnemy(e, 0.4 * n);
+  }
+}
+
 /** Fling every held prop toward a point in front of the player. */
 function launchHeld(
   pp: { x: number; y: number; z: number },
@@ -212,34 +317,64 @@ function launchHeld(
 ) {
   const now = performance.now();
   const f = player.facing;
-  const power = 1 + (gameStore.get().level - 1) * 0.1;
+  const { level, upgrades } = gameStore.get();
+  const power = (1 + (level - 1) * 0.1) * 1.2 ** stacks(upgrades, "power");
+  const targets = pickTargets(pp, f);
   let count = 0;
 
   for (const e of props) {
     if (!e.held) continue;
     drop(e);
-    count++;
-
-    // Converge slightly on a point ahead, like a shotgun funnel.
-    const p = e.body.translation();
-    toAim
-      .set(pp.x + f.x * 12 - p.x, pp.y + 0.6 - p.y, pp.z + f.z * 12 - p.z)
-      .normalize();
-    shot
-      .set(f.x, 0, f.z)
-      .lerp(toAim, 0.5)
-      .normalize()
-      .applyAxisAngle(up, MathUtils.randFloatSpread(launch.spread));
-
     const speed = (launch.speed * power) / massFactor(e) ** 0.25;
-    e.body.setLinvel(
-      {
-        x: shot.x * speed + pv.x * 0.5,
-        y: shot.y * speed + launch.lift,
-        z: shot.z * speed + pv.z * 0.5,
-      },
-      true,
-    );
+    const p = e.body.translation();
+    const target = targets.length ? targets[count % targets.length] : null;
+    count++;
+    e.target = target;
+    e.exploded = false;
+
+    if (target) {
+      // Auto-aim: ballistic shot with lead on the invader's movement.
+      const tp = target.body.translation();
+      const tv = target.body.linvel();
+      let tx = tp.x;
+      let tz = tp.z;
+      let t = Math.hypot(tx - p.x, tz - p.z) / speed;
+      tx += tv.x * t;
+      tz += tv.z * t;
+      const dist = Math.hypot(tx - p.x, tz - p.z);
+      t = Math.max(dist / speed, 0.05);
+      const vy = MathUtils.clamp(
+        (tp.y + 0.2 - p.y) / t + 0.5 * GRAVITY * t,
+        -6,
+        18,
+      );
+      e.body.setLinvel(
+        {
+          x: ((tx - p.x) / dist) * speed,
+          y: vy,
+          z: ((tz - p.z) / dist) * speed,
+        },
+        true,
+      );
+    } else {
+      // No target: converge slightly on a point ahead, like a shotgun funnel.
+      toAim
+        .set(pp.x + f.x * 12 - p.x, pp.y + 0.6 - p.y, pp.z + f.z * 12 - p.z)
+        .normalize();
+      shot
+        .set(f.x, 0, f.z)
+        .lerp(toAim, 0.5)
+        .normalize()
+        .applyAxisAngle(up, MathUtils.randFloatSpread(launch.spread));
+      e.body.setLinvel(
+        {
+          x: shot.x * speed + pv.x * 0.5,
+          y: shot.y * speed + launch.lift,
+          z: shot.z * speed + pv.z * 0.5,
+        },
+        true,
+      );
+    }
     e.body.setAngvel(
       {
         x: MathUtils.randFloatSpread(14),
