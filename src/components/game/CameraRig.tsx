@@ -17,11 +17,14 @@ const TRAUMA_DECAY = 1.8;
 
 /** Elevated third-person camera that smoothly follows the player, with trauma shake. */
 export function CameraRig() {
-  useFrame(({ camera, clock }, delta) => {
+  useFrame(({ camera, clock, size }, delta) => {
     if (!player.object) return;
     const dt = Math.min(delta, 0.1);
     player.object.getWorldPosition(target);
-    desired.copy(target).add(offset);
+    // Pull back on portrait screens so the field still fits horizontally.
+    const aspect = size.width / Math.max(size.height, 1);
+    const zoom = aspect < 1 ? Math.min(1 / aspect, 1.8) ** 0.75 : 1;
+    desired.copy(target).addScaledVector(offset, zoom);
     if (!initialized) {
       base.copy(camera.position);
       initialized = true;

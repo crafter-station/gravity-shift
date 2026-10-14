@@ -89,7 +89,7 @@ function Ground() {
       ))}
       <mesh receiveShadow rotation-x={-Math.PI / 2} position={[0, 0.03, 0]}>
         <ringGeometry args={[2.6, 3.4, 32]} />
-        <meshStandardMaterial color="#b794f6" flatShading />
+        <meshStandardMaterial color="#ffe08a" flatShading />
       </mesh>
     </RigidBody>
   );
