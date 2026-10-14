@@ -24,7 +24,7 @@ export const ENEMY_STATS: Record<
     radius: 0.45,
     hp: 1,
     speed: 1.7,
-    coreDamage: 6,
+    coreDamage: 8,
     points: 20,
     density: 1,
     stun: 0.7,
@@ -34,7 +34,7 @@ export const ENEMY_STATS: Record<
     radius: 0.36,
     hp: 0.6,
     speed: 3.2,
-    coreDamage: 4,
+    coreDamage: 5,
     points: 25,
     density: 0.8,
     stun: 0.7,
@@ -44,7 +44,7 @@ export const ENEMY_STATS: Record<
     radius: 0.8,
     hp: 6,
     speed: 1.2,
-    coreDamage: 15,
+    coreDamage: 18,
     points: 70,
     density: 2.5,
     stun: 0.35,
@@ -54,7 +54,7 @@ export const ENEMY_STATS: Record<
     radius: 1.7,
     hp: 35,
     speed: 0.75,
-    coreDamage: 45,
+    coreDamage: 50,
     points: 500,
     density: 3,
     stun: 0.1,
@@ -65,7 +65,7 @@ export const ENEMY_STATS: Record<
 export const TOTAL_WAVES = 10;
 const CORE_HP = 100;
 /** Max invaders alive at once (mobile physics budget). */
-const MAX_ALIVE = 22;
+const MAX_ALIVE = 26;
 const SPAWN_RADIUS = 18.5;
 
 type Spawn = { kind: EnemyKind; at: number };
@@ -77,6 +77,9 @@ const run = {
   /** Spawn requests handed to <Enemies /> but not yet registered. */
   pending: 0,
   clearedAt: 0,
+  /** Invaders arrive in packs from one direction, forcing the player to reposition. */
+  packAngle: 0,
+  packLeft: 0,
   /** Seconds since the last mid-wave supply drop. */
   sinceDrop: 0,
 };
@@ -102,12 +105,12 @@ export function spawnFulfilled() {
 
 function buildWave(n: number): Spawn[] {
   const counts: Record<EnemyKind, number> = {
-    minion: [5, 8, 8, 8, 6, 10, 10, 12, 14, 12][n - 1] ?? 14,
-    runner: [0, 0, 3, 0, 0, 4, 6, 4, 8, 6][n - 1] ?? 8,
-    brute: [0, 0, 0, 2, 0, 2, 3, 4, 5, 3][n - 1] ?? 5,
+    minion: [5, 8, 10, 10, 8, 14, 16, 18, 22, 20][n - 1] ?? 22,
+    runner: [0, 0, 3, 2, 2, 6, 8, 8, 10, 10][n - 1] ?? 10,
+    brute: [0, 0, 0, 2, 1, 3, 4, 5, 6, 5][n - 1] ?? 6,
     boss: n === 5 || n === 10 ? 1 : 0,
   };
-  const gap = Math.max(0.45, 2 - n * 0.15);
+  const gap = Math.max(0.35, 1.9 - n * 0.16);
   const spawns: Spawn[] = [];
   if (counts.boss) spawns.push({ kind: "boss", at: 1.5 });
   const pool: EnemyKind[] = [];
@@ -119,7 +122,12 @@ function buildWave(n: number): Spawn[] {
     const j = Math.floor(Math.random() * (i + 1));
     [pool[i], pool[j]] = [pool[j], pool[i]];
   }
-  pool.sort((a, b) => (a === "brute" ? 1 : 0) - (b === "brute" ? 1 : 0) || 0);
+  // Brutes never lead the wave: give the player a few easy kills first.
+  for (let i = 0; i < Math.min(3, pool.length); i++) {
+    if (pool[i] !== "brute") continue;
+    const j = pool.findIndex((k, idx) => idx >= 3 && k !== "brute");
+    if (j > 0) [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
   pool.forEach((kind, i) => {
     spawns.push({ kind, at: 1 + i * gap });
   });
@@ -243,7 +251,12 @@ export function tickWaves(dt: number) {
     enemies.size + run.pending < MAX_ALIVE
   ) {
     const { kind } = run.spawns[run.next++];
-    const a = Math.random() * Math.PI * 2;
+    if (run.packLeft <= 0 || kind === "boss") {
+      run.packAngle = Math.random() * Math.PI * 2;
+      run.packLeft = 2 + Math.floor(gameStore.get().wave / 3);
+    }
+    run.packLeft--;
+    const a = run.packAngle + (Math.random() - 0.5) * 0.7;
     run.pending++;
     for (const l of spawnListeners)
       l({

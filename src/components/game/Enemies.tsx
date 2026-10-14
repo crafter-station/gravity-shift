@@ -32,6 +32,7 @@ import {
   type EnemyKind,
   type PropEntry,
 } from "@/game/registry";
+import { gameStore } from "@/game/store";
 import {
   damageCore,
   ENEMY_STATS,
@@ -104,6 +105,10 @@ const Enemy = memo(function Enemy({
     const obj = group.current;
     if (!rb || !obj) return;
     const handle = rb.handle;
+    // The final boss is a tougher king.
+    const maxHp =
+      stats.hp *
+      (spawn.kind === "boss" && gameStore.get().wave >= 10 ? 1.6 : 1);
     const becomeHusk = () => {
       rb.lockRotations(false, true);
       rb.setLinearDamping(0.3);
@@ -140,8 +145,8 @@ const Enemy = memo(function Enemy({
       body: rb,
       object: obj,
       kind: spawn.kind,
-      hp: stats.hp,
-      maxHp: stats.hp,
+      hp: maxHp,
+      maxHp,
       radius: stats.radius,
       stunUntil: 0,
       lastContactAt: 0,
