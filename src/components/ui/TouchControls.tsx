@@ -7,6 +7,13 @@ const BASE = 128;
 const RADIUS = 44;
 const DEAD_ZONE = 0.12;
 
+/** Capture can throw for pointers the browser no longer tracks; input still works without it. */
+function capture(e: React.PointerEvent<HTMLElement>) {
+  try {
+    e.currentTarget.setPointerCapture(e.pointerId);
+  } catch {}
+}
+
 /** Virtual joystick (floating, bottom-left) + gravity button, only on coarse pointers. */
 export function TouchControls() {
   const areaRef = useRef<HTMLDivElement>(null);
@@ -67,7 +74,7 @@ export function TouchControls() {
     const area = areaRef.current;
     const base = baseRef.current;
     if (!area || !base) return;
-    e.currentTarget.setPointerCapture(e.pointerId);
+    capture(e);
     const rect = area.getBoundingClientRect();
     const half = BASE / 2;
     // Floating origin, clamped so the whole base stays inside the area.
@@ -103,7 +110,7 @@ export function TouchControls() {
   const onButtonDown = (e: React.PointerEvent<HTMLButtonElement>) => {
     e.stopPropagation();
     if (attractId.current !== -1) return;
-    e.currentTarget.setPointerCapture(e.pointerId);
+    capture(e);
     attractId.current = e.pointerId;
     setAttract(true);
   };
