@@ -14,6 +14,7 @@ import { CONFIG, LEVELS } from "@/game/config";
 import { getMoveVector } from "@/game/input";
 import { player } from "@/game/registry";
 import { gameStore } from "@/game/store";
+import { UfoModel } from "./models/UfoModel";
 
 const forward = new Vector3();
 const right = new Vector3();
@@ -80,7 +81,7 @@ export function Player() {
 
     const p = rb.translation();
     if (p.y < CONFIG.killY) {
-      rb.setTranslation({ x: 0, y: 2, z: 0 }, true);
+      rb.setTranslation({ x: 0, y: 2, z: 5 }, true);
       rb.setLinvel({ x: 0, y: 0, z: 0 }, true);
     }
   });
@@ -110,7 +111,7 @@ export function Player() {
     <>
       <RigidBody
         ref={body}
-        position={[0, 1, 0]}
+        position={[0, 1, 5]}
         colliders={false}
         ccd
         linearDamping={0.5}
@@ -125,7 +126,7 @@ export function Player() {
         <group ref={anchor} />
       </RigidBody>
       <group ref={visual}>
-        <PlayerOrb />
+        <UfoModel />
       </group>
       <group ref={arrow}>
         <mesh rotation-x={-Math.PI / 2} position-z={BASE_RADIUS + 0.55}>
@@ -134,20 +135,5 @@ export function Player() {
         </mesh>
       </group>
     </>
-  );
-}
-
-/** Placeholder orb visual (radius BASE_RADIUS, centered). */
-function PlayerOrb() {
-  return (
-    <mesh castShadow>
-      <icosahedronGeometry args={[BASE_RADIUS, 1]} />
-      <meshStandardMaterial
-        color="#7c4dff"
-        emissive="#5b2bff"
-        emissiveIntensity={0.6}
-        flatShading
-      />
-    </mesh>
   );
 }
