@@ -67,6 +67,8 @@ export function PropBody({
       breakable: KINDS[kind].breakable,
       wrecked: false,
       broken: false,
+      target: null,
+      exploded: false,
     };
     entry.current = e;
     const handle = e.body.handle;

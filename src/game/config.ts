@@ -46,4 +46,5 @@ export const KINDS: Record<
   vehicle: { tier: 3, points: 50, breakable: false },
   kiosk: { tier: 4, points: 80, breakable: true },
   bus: { tier: 5, points: 150, breakable: false },
+  husk: { tier: 1, points: 5, breakable: true },
 };

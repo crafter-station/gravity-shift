@@ -1,5 +1,6 @@
 import type { CollisionEnterPayload } from "@react-three/rapier";
 import { damage } from "./breakables";
+import { maybeDetonate } from "./combat";
 import { CONFIG } from "./config";
 import type { PropEntry, PropKind } from "./registry";
 
@@ -77,6 +78,8 @@ export function reportImpact(entry: PropEntry, payload: CollisionEnterPayload) {
     y = p.y;
     z = p.z;
   }
+
+  if (projectile) maybeDetonate(entry, x, y, z);
 
   emitImpact({
     x,

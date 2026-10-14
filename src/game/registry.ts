@@ -10,7 +10,8 @@ export type PropKind =
   | "pin"
   | "cart"
   | "kiosk"
-  | "bus";
+  | "bus"
+  | "husk";
 
 /** Runtime data for every dynamic prop the gravity field can grab. */
 export type PropEntry = {
@@ -36,6 +37,10 @@ export type PropEntry = {
   wrecked: boolean;
   /** Shattered and removed from the world. */
   broken: boolean;
+  /** Auto-aim target assigned at launch (homing upgrade steers toward it). */
+  target: EnemyEntry | null;
+  /** Already detonated this throw (explosive upgrade). */
+  exploded: boolean;
 };
 
 /** Props still in play (grabbable). Broken props are removed from here. */
@@ -71,6 +76,12 @@ export type EnemyEntry = {
   radius: number;
   /** Knocked back: no steering until performance.now() passes this. */
   stunUntil: number;
+  /** Last time held-orbit contact damage was applied (spin upgrade). */
+  lastContactAt: number;
+  /** performance.now() of the last damage, drives the hit flash. */
+  hitAt: number;
+  /** Called once when the enemy leaves play: killed (becomes a husk) or reached the core. */
+  onDefeat: (reason: "killed" | "core") => void;
 };
 
 /** Live (not yet defeated) enemies. */
