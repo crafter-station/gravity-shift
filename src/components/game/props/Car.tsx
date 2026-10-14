@@ -1,6 +1,7 @@
 "use client";
 
 import { CuboidCollider } from "@react-three/rapier";
+import { CarModel } from "../models/CarModel";
 import { PropBody } from "../PropBody";
 
 type CarProps = {
@@ -9,45 +10,23 @@ type CarProps = {
   rotationY?: number;
 };
 
-const WHEELS: [number, number][] = [
-  [-0.5, -0.42],
-  [0.5, -0.42],
-  [-0.5, 0.42],
-  [0.5, 0.42],
-];
+/** Body origin height: colliders and model are offset so wheels touch y = 0. */
+const LIFT = 0.52;
 
-/** Small cartoon car: chunky body, glass cabin and four wheels. */
+/** Small cartoon car (Blender model), nose toward +Z before rotation. */
 export function Car({ position, color, rotationY = 0 }: CarProps) {
   return (
     <PropBody
       kind="vehicle"
       color={color}
-      position={[position[0], 0.42, position[2]]}
+      position={[position[0], LIFT, position[2]]}
       rotation={[0, rotationY, 0]}
       colliders={false}
       density={2}
     >
-      <CuboidCollider args={[0.7, 0.2, 0.4]} />
-      <CuboidCollider args={[0.35, 0.175, 0.35]} position={[-0.1, 0.375, 0]} />
-      <mesh castShadow receiveShadow>
-        <boxGeometry args={[1.4, 0.4, 0.8]} />
-        <meshStandardMaterial color={color} flatShading />
-      </mesh>
-      <mesh castShadow position={[-0.1, 0.375, 0]}>
-        <boxGeometry args={[0.7, 0.35, 0.7]} />
-        <meshStandardMaterial color="#bfe9ff" flatShading />
-      </mesh>
-      {WHEELS.map(([x, z]) => (
-        <mesh
-          key={`${x}${z}`}
-          castShadow
-          position={[x, -0.2, z]}
-          rotation={[Math.PI / 2, 0, 0]}
-        >
-          <cylinderGeometry args={[0.22, 0.22, 0.16, 12]} />
-          <meshStandardMaterial color="#2b2b3a" flatShading />
-        </mesh>
-      ))}
+      <CuboidCollider args={[0.5, 0.32, 1.0]} position={[0, -0.2, 0]} />
+      <CuboidCollider args={[0.42, 0.22, 0.5]} position={[0, 0.32, -0.12]} />
+      <CarModel color={color} position={[0, -LIFT, 0]} />
     </PropBody>
   );
 }
