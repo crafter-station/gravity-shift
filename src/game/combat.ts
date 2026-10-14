@@ -10,6 +10,25 @@ import { gameStore } from "./store";
 import { stacks } from "./upgrades";
 import { ENEMY_STATS, enemyRemoved } from "./waves";
 
+/** Player collider membership group (props can opt out of hitting it). */
+export const PLAYER_GROUP = 1;
+const ALL = 0xffff;
+const NO_PLAYER = ALL & ~(1 << PLAYER_GROUP);
+/** Packed Rapier interaction groups: (memberships << 16) | filter. */
+export const PLAYER_GROUPS = ((1 << PLAYER_GROUP) << 16) | ALL;
+const DEFAULT_GROUPS = (ALL << 16) | ALL;
+const GHOST_GROUPS = (NO_PLAYER << 16) | NO_PLAYER;
+
+/** Lets held / just-launched props pass through the player so volleys aren't deflected. */
+export function setGhost(prop: PropEntry, ghost: boolean) {
+  if (prop.ghost === ghost) return;
+  prop.ghost = ghost;
+  const groups = ghost ? GHOST_GROUPS : DEFAULT_GROUPS;
+  for (let i = 0; i < prop.body.numColliders(); i++) {
+    prop.body.collider(i).setCollisionGroups(groups);
+  }
+}
+
 /** Lookup from rigid body handle to live enemy (collision resolution). */
 export const enemyByHandle = new Map<number, EnemyEntry>();
 
@@ -95,7 +114,9 @@ export function propHitsEnemy(
   const now = performance.now();
   const projectile = now < prop.projectileUntil;
   if (projectile) {
-    const dmg = (prop.body.mass() ** 0.7 * relSpeed * powerMultiplier()) / 12;
+    // Generous on purpose: any solid throw one-shots a minion; heavy props wreck brutes.
+    const dmg =
+      ((0.6 + Math.sqrt(prop.body.mass())) * relSpeed * powerMultiplier()) / 15;
     if (dmg > 0.05) damageEnemy(e, dmg);
     return;
   }

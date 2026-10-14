@@ -69,6 +69,7 @@ export function PropBody({
       broken: false,
       target: null,
       exploded: false,
+      ghost: false,
     };
     entry.current = e;
     const handle = e.body.handle;

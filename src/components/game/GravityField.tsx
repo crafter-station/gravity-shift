@@ -11,7 +11,7 @@ import {
   type MeshBasicMaterial,
   Vector3,
 } from "three";
-import { damageEnemy } from "@/game/combat";
+import { damageEnemy, setGhost } from "@/game/combat";
 import { CONFIG, LEVELS } from "@/game/config";
 import { emitImpact } from "@/game/effects";
 import { emit } from "@/game/events";
@@ -118,8 +118,14 @@ export function GravityField() {
     let held = 0;
     for (const e of props) if (e.held) held++;
 
+    const now = performance.now();
     for (const e of props) {
       const p = e.body.translation();
+      // Held props and fresh throws pass through the player.
+      setGhost(
+        e,
+        e.held || now < e.projectileUntil - launch.projectileMs + 350,
+      );
 
       if (p.y < CONFIG.killY) {
         if (e.held) drop(e);

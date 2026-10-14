@@ -10,6 +10,7 @@ import {
 } from "@react-three/rapier";
 import { useEffect, useRef } from "react";
 import { type Group, MathUtils, Vector3 } from "three";
+import { PLAYER_GROUPS } from "@/game/combat";
 import { CONFIG, LEVELS } from "@/game/config";
 import { getMoveVector } from "@/game/input";
 import { player } from "@/game/registry";
@@ -121,6 +122,7 @@ export function Player() {
           ref={collider}
           args={[BASE_RADIUS]}
           density={6}
+          collisionGroups={PLAYER_GROUPS}
           friction={1.2}
         />
         <group ref={anchor} />

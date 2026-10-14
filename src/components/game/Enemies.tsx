@@ -4,6 +4,7 @@ import { Billboard } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
 import {
   CapsuleCollider,
+  type RapierCollider,
   type RapierRigidBody,
   RigidBody,
   useBeforePhysicsStep,
@@ -40,7 +41,7 @@ import {
 } from "@/game/waves";
 
 /** Seconds a knocked-out husk lies around before crumbling (if not grabbed). */
-const HUSK_LIFETIME = 9;
+const HUSK_LIFETIME = 14;
 
 type Spawned = { id: number; kind: EnemyKind; x: number; z: number };
 
@@ -82,6 +83,7 @@ const Enemy = memo(function Enemy({
 }) {
   const stats = ENEMY_STATS[spawn.kind];
   const body = useRef<RapierRigidBody>(null);
+  const collider = useRef<RapierCollider>(null);
   const group = useRef<Group>(null);
   const visual = useRef<Group>(null);
   const hpBar = useRef<Mesh>(null);
@@ -90,6 +92,9 @@ const Enemy = memo(function Enemy({
   const [dead, setDead] = useState(false);
   const wobble = useRef(Math.random() * Math.PI * 2);
   const huskAge = useRef(0);
+  const stuck = useRef(0);
+  const detourUntil = useRef(0);
+  const detourSide = useRef(1);
   const flashMats = useRef<MeshStandardMaterial[]>([]);
   const halfHeight = stats.radius * 0.35;
 
@@ -102,6 +107,8 @@ const Enemy = memo(function Enemy({
     const becomeHusk = () => {
       rb.lockRotations(false, true);
       rb.setLinearDamping(0.3);
+      // Walkers glide frictionless; husks tumble and grip like normal props.
+      collider.current?.setFriction(0.7);
       const h: PropEntry = {
         body: rb,
         object: obj as Group,
@@ -121,6 +128,7 @@ const Enemy = memo(function Enemy({
         broken: false,
         target: null,
         exploded: false,
+        ghost: false,
       };
       husk.current = h;
       registerProp(h);
@@ -217,7 +225,20 @@ const Enemy = memo(function Enemy({
     // March toward the core with a slight zig-zag so lines don't look robotic.
     toCore.normalize();
     wobble.current += 0.04;
-    const side = Math.sin(wobble.current) * 0.35;
+    let side = Math.sin(wobble.current) * 0.35;
+
+    // No pathfinding: if blocked (barely moving), sidestep around the obstacle for a bit.
+    const now = performance.now();
+    const vel = rb.linvel();
+    if (Math.hypot(vel.x, vel.z) < stats.speed * 0.25) {
+      stuck.current += 1 / 60;
+      if (stuck.current > 0.5 && now > detourUntil.current) {
+        detourUntil.current = now + 1200;
+        detourSide.current = Math.random() < 0.5 ? -1 : 1;
+        stuck.current = 0;
+      }
+    } else stuck.current = Math.max(0, stuck.current - 1 / 60);
+    if (now < detourUntil.current) side = detourSide.current * 1.6;
     const dx = toCore.x - toCore.z * side;
     const dz = toCore.z + toCore.x * side;
     const len = Math.hypot(dx, dz) || 1;
@@ -281,7 +302,7 @@ const Enemy = memo(function Enemy({
       colliders={false}
       lockRotations
       ccd
-      linearDamping={0.6}
+      linearDamping={0.2}
       onCollisionEnter={(payload) => {
         const e = entry.current;
         if (husk.current) {
@@ -297,9 +318,10 @@ const Enemy = memo(function Enemy({
       }}
     >
       <CapsuleCollider
+        ref={collider}
         args={[halfHeight, stats.radius]}
         density={stats.density}
-        friction={0.4}
+        friction={0}
       />
       <group ref={group}>
         <group position-y={-(stats.radius + halfHeight)}>

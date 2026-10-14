@@ -41,6 +41,8 @@ export type PropEntry = {
   target: EnemyEntry | null;
   /** Already detonated this throw (explosive upgrade). */
   exploded: boolean;
+  /** Currently ignoring the player collider (held or just launched). */
+  ghost: boolean;
 };
 
 /** Props still in play (grabbable). Broken props are removed from here. */
