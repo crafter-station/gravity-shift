@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { levelProgress, MAX_LEVEL } from "@/game/progression";
 import { comboMultiplier, startGame } from "@/game/score";
 import { useGameStore } from "@/game/store";
@@ -9,11 +9,6 @@ import { MuteButton } from "./MuteButton";
 const HINT_MS = 8000;
 const CARD =
   "rounded-2xl bg-white/85 shadow-lg ring-2 ring-white/70 backdrop-blur";
-
-function formatTime(t: number) {
-  const s = Math.max(0, Math.ceil(t));
-  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
-}
 
 /** Playing-only overlay: score, combo, timer, level, destruction, controls hint. */
 export function Hud() {
@@ -25,12 +20,20 @@ export function Hud() {
 function HudInner() {
   const score = useGameStore((s) => s.score);
   const combo = useGameStore((s) => s.combo);
-  const timeLeft = useGameStore((s) => s.enemiesLeft);
+  const wave = useGameStore((s) => s.wave);
+  const totalWaves = useGameStore((s) => s.totalWaves);
+  const enemiesLeft = useGameStore((s) => s.enemiesLeft);
+  const coreHp = useGameStore((s) => s.coreHp);
+  const coreMaxHp = useGameStore((s) => s.coreMaxHp);
   const level = useGameStore((s) => s.level);
   const xp = useGameStore((s) => s.xp);
-  const destruction = useGameStore((s) => s.destruction);
   const held = useGameStore((s) => s.held);
   const attracting = useGameStore((s) => s.attracting);
+  const prevHp = useRef(coreHp);
+  const dropped = coreHp < prevHp.current;
+  useEffect(() => {
+    prevHp.current = coreHp;
+  }, [coreHp]);
   const [hintVisible, setHintVisible] = useState(true);
 
   useEffect(() => {
@@ -38,13 +41,19 @@ function HudInner() {
     return () => window.clearTimeout(id);
   }, []);
 
-  const urgent = timeLeft <= 10;
+  const hpRatio = Math.max(0, Math.min(1, coreHp / coreMaxHp));
+  const hpColor =
+    hpRatio > 0.6
+      ? "bg-green-500"
+      : hpRatio > 0.3
+        ? "bg-yellow-400"
+        : "bg-red-500";
   const maxed = level >= MAX_LEVEL;
   const { ratio } = levelProgress(level, xp);
-  const pct = Math.round(destruction * 100);
 
   return (
     <div className="pointer-events-none absolute inset-0 flex flex-col justify-between pt-[max(1rem,env(safe-area-inset-top))] pr-[max(1rem,env(safe-area-inset-right))] pb-[max(1rem,env(safe-area-inset-bottom))] pl-[max(1rem,env(safe-area-inset-left))] text-slate-900">
+      <style>{`@keyframes gs-core-hit { 0%,100% { transform: none; } 20% { transform: translateX(-6px); background: rgb(254 202 202); } 40% { transform: translateX(6px); } 60% { transform: translateX(-4px); } 80% { transform: translateX(3px); } }`}</style>
       <div className="flex flex-col gap-2">
         <div className="flex items-start justify-between gap-2">
           <div className="flex min-w-0 flex-col items-start gap-1.5">
@@ -78,12 +87,15 @@ function HudInner() {
 
           <div className="flex items-start gap-2">
             <div
-              className={`${CARD} px-3 py-1.5 text-center text-2xl leading-none font-black tabular-nums sm:text-3xl ${
-                urgent ? "animate-pulse bg-red-500/90 text-white" : ""
-              }`}
-              role="timer"
+              className={`${CARD} px-3 py-1.5 text-center leading-none`}
+              aria-live="polite"
             >
-              {formatTime(timeLeft)}
+              <div className="text-lg font-black tabular-nums sm:text-2xl">
+                WAVE {wave}/{totalWaves}
+              </div>
+              <div className="mt-0.5 text-[0.6rem] font-extrabold tracking-wide text-slate-600 uppercase">
+                {enemiesLeft} invader{enemiesLeft === 1 ? "" : "s"} left
+              </div>
             </div>
             <MuteButton />
             <button
@@ -127,15 +139,20 @@ function HudInner() {
               <span className="text-xs font-black text-brand">MAX</span>
             ) : null}
           </div>
-          <div className={`${CARD} px-2.5 py-1.5`}>
+          <div
+            key={coreHp}
+            className={`${CARD} px-2.5 py-1.5 ${dropped ? "animate-[gs-core-hit_0.4s_ease-out]" : ""}`}
+          >
             <div className="mb-1 flex justify-between text-[0.65rem] font-extrabold tracking-wide uppercase">
-              <span>Plaza wrecked</span>
-              <span className="tabular-nums">{pct}%</span>
+              <span>Core</span>
+              <span className="tabular-nums">
+                {Math.ceil(coreHp)}/{coreMaxHp}
+              </span>
             </div>
-            <div className="h-2.5 overflow-hidden rounded-full bg-slate-300/70">
+            <div className="h-4 overflow-hidden rounded-full bg-slate-300/70 ring-1 ring-slate-900/20">
               <div
-                className="h-full rounded-full bg-linear-to-r from-amber-400 to-red-500 transition-[width] duration-300"
-                style={{ width: `${pct}%` }}
+                className={`h-full rounded-full transition-[width] duration-300 ${hpColor}`}
+                style={{ width: `${hpRatio * 100}%` }}
               />
             </div>
           </div>
