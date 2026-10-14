@@ -3,7 +3,6 @@ import type { PropKind } from "./registry";
 /** Central tuning knobs. Tweak here to change the game feel. */
 export const CONFIG = {
   arena: { size: 40 },
-  game: { durationSec: 90 },
   player: { radius: 0.55, speed: 7.5, accel: 10 },
   camera: { offset: [0, 9, 10.5] as const, follow: 5 },
   field: {
@@ -26,10 +25,10 @@ export const CONFIG = {
  */
 export const LEVELS = [
   { xp: 0, radius: 0.55, field: 6, maxHeld: 8, tier: 1 },
-  { xp: 150, radius: 0.7, field: 7.5, maxHeld: 12, tier: 2 },
-  { xp: 450, radius: 0.85, field: 9, maxHeld: 16, tier: 3 },
-  { xp: 1100, radius: 1.05, field: 10.5, maxHeld: 20, tier: 4 },
-  { xp: 2200, radius: 1.3, field: 12, maxHeld: 26, tier: 5 },
+  { xp: 200, radius: 0.7, field: 7.5, maxHeld: 12, tier: 2 },
+  { xp: 700, radius: 0.85, field: 9, maxHeld: 16, tier: 3 },
+  { xp: 1800, radius: 1.05, field: 10.5, maxHeld: 20, tier: 4 },
+  { xp: 4000, radius: 1.3, field: 12, maxHeld: 26, tier: 5 },
 ] as const;
 
 /** Per-kind gameplay data: minimum level tier to lift it, base points, can it shatter. */
