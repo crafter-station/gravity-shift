@@ -3,20 +3,41 @@
 import { useFrame } from "@react-three/fiber";
 import { Vector3 } from "three";
 import { CONFIG } from "@/game/config";
+import { shake } from "@/game/effects";
 import { player } from "@/game/registry";
 
 const target = new Vector3();
 const desired = new Vector3();
+const base = new Vector3();
 const offset = new Vector3(...CONFIG.camera.offset);
+let initialized = false;
 
-/** Elevated third-person camera that smoothly follows the player. */
+const MAX_SHAKE = 0.35;
+const TRAUMA_DECAY = 1.8;
+
+/** Elevated third-person camera that smoothly follows the player, with trauma shake. */
 export function CameraRig() {
-  useFrame(({ camera }, delta) => {
+  useFrame(({ camera, clock }, delta) => {
     if (!player.object) return;
+    const dt = Math.min(delta, 0.1);
     player.object.getWorldPosition(target);
     desired.copy(target).add(offset);
-    const k = 1 - Math.exp(-CONFIG.camera.follow * Math.min(delta, 0.1));
-    camera.position.lerp(desired, k);
+    if (!initialized) {
+      base.copy(camera.position);
+      initialized = true;
+    }
+    // Smooth base position never includes the shake offset.
+    base.lerp(desired, 1 - Math.exp(-CONFIG.camera.follow * dt));
+    camera.position.copy(base);
+
+    if (shake.trauma > 0) {
+      const t = clock.elapsedTime * 38;
+      const amp = shake.trauma * shake.trauma * MAX_SHAKE;
+      camera.position.x += Math.sin(t * 1.3) * amp;
+      camera.position.y += Math.sin(t * 1.7 + 2) * amp * 0.7;
+      camera.position.z += Math.sin(t * 1.1 + 4) * amp;
+      shake.trauma = Math.max(0, shake.trauma - TRAUMA_DECAY * dt);
+    }
     camera.lookAt(target.x, target.y + 0.5, target.z);
   });
   return null;
