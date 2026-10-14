@@ -1,7 +1,5 @@
+import { GameRoot } from "@/components/GameRoot";
+
 export default function Home() {
-  return (
-    <main>
-      <div>Hello world!</div>
-    </main>
-  );
+  return <GameRoot />;
 }
