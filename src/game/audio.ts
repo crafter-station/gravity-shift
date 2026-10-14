@@ -486,10 +486,34 @@ export function gameStart() {
   });
 }
 
-/** Fanfare, with extra sparkle for a new best. */
-export function gameEnd(best: boolean) {
+/** Victory fanfare (with sparkle for a new best) or sad trombone on defeat. */
+export function gameEnd(victory: boolean, best: boolean) {
   const c = ready("gameEnd", 500);
   if (!c) return;
+  if (!victory) {
+    claim(c, 1.6);
+    [233.08, 220, 207.65].forEach((f, i) => {
+      tone(c, {
+        type: "sawtooth",
+        freq: f,
+        dur: 0.38,
+        vol: 0.14,
+        delay: i * 0.4,
+        attack: 0.04,
+      });
+    });
+    // Final wah-wah slide.
+    tone(c, {
+      type: "sawtooth",
+      freq: 196,
+      to: 130,
+      dur: 0.9,
+      vol: 0.16,
+      delay: 1.2,
+      attack: 0.05,
+    });
+    return;
+  }
   claim(c, 1.4);
   const notes = [392, 523.25, 659.25, 783.99, 1046.5];
   notes.forEach((f, i) => {
@@ -520,4 +544,235 @@ export function uiClick() {
   if (!c) return;
   claim(c, 0.06);
   tone(c, { type: "sine", freq: 700, to: 500, dur: 0.05, vol: 0.12 });
+}
+
+// ---------------------------------------------------------------------------
+// Defend-the-plaza sounds
+// ---------------------------------------------------------------------------
+
+/** Horn/drum hit; ominous siren and rumble on boss waves. */
+export function waveStart(boss: boolean) {
+  const c = ready("waveStart", 300);
+  if (!c) return;
+  if (boss) {
+    claim(c, 1.6);
+    tone(c, {
+      type: "sawtooth",
+      freq: 110,
+      to: 190,
+      dur: 0.75,
+      vol: 0.16,
+      attack: 0.1,
+    });
+    tone(c, {
+      type: "sawtooth",
+      freq: 190,
+      to: 100,
+      dur: 0.75,
+      vol: 0.16,
+      delay: 0.75,
+      attack: 0.1,
+    });
+    tone(c, { type: "sine", freq: 55, to: 35, dur: 1.4, vol: 0.5 });
+    noise(c, { filter: "lowpass", freq: 200, dur: 1.4, vol: 0.4, attack: 0.2 });
+    return;
+  }
+  claim(c, 0.5);
+  tone(c, { type: "sine", freq: 140, to: 60, dur: 0.25, vol: 0.5 });
+  tone(c, { type: "sawtooth", freq: 294, dur: 0.18, vol: 0.12, delay: 0.1 });
+  tone(c, { type: "sawtooth", freq: 392, dur: 0.3, vol: 0.12, delay: 0.25 });
+}
+
+/** Bright chime. */
+export function waveCleared() {
+  const c = ready("waveCleared", 300);
+  if (!c) return;
+  claim(c, 0.8);
+  [783.99, 1174.66, 1567.98].forEach((f, i) => {
+    tone(c, { type: "sine", freq: f, dur: 0.5, vol: 0.18, delay: i * 0.1 });
+    tone(c, { type: "sine", freq: f * 2, dur: 0.3, vol: 0.05, delay: i * 0.1 });
+  });
+}
+
+/** Power-up sweep. */
+export function upgradePicked() {
+  const c = ready("upgrade", 200);
+  if (!c) return;
+  claim(c, 0.5);
+  tone(c, { type: "square", freq: 220, to: 1100, dur: 0.35, vol: 0.08 });
+  tone(c, { type: "triangle", freq: 440, to: 2200, dur: 0.35, vol: 0.14 });
+  tone(c, { type: "sine", freq: 1320, dur: 0.25, vol: 0.12, delay: 0.3 });
+}
+
+/** Falling whistle, then soft thuds about a second later. */
+export function supplyDrop(count: number) {
+  const c = ready("supply", 400);
+  if (!c) return;
+  claim(c, 1.8);
+  tone(c, { type: "sine", freq: 1800, to: 400, dur: 1, vol: 0.1, attack: 0.1 });
+  const n = Math.min(Math.max(count, 1), 5);
+  for (let i = 0; i < n; i++) {
+    const d = 1 + i * rand(0.05, 0.12);
+    tone(c, {
+      type: "sine",
+      freq: rand(90, 130),
+      to: 50,
+      dur: 0.18,
+      vol: 0.28,
+      delay: d,
+    });
+    noise(c, { filter: "lowpass", freq: 600, dur: 0.08, vol: 0.12, delay: d });
+  }
+}
+
+/** Very subtle teleport blip. */
+export function enemySpawn() {
+  const c = ready("spawn", 140);
+  if (!c) return;
+  claim(c, 0.12);
+  tone(c, {
+    type: "sine",
+    freq: rand(600, 800),
+    to: rand(1000, 1300),
+    dur: 0.08,
+    vol: 0.025,
+  });
+}
+
+/** Cartoony bonk by kind, scaled by damage. */
+export function enemyHit(kind: string, damage: number) {
+  const c = ready(`ehit-${kind}`, 50);
+  if (!c) return;
+  const d = Math.max(0.2, Math.min(1, damage / 5));
+  const vol = 0.15 + d * 0.3;
+  const p = rand(0.94, 1.06);
+  claim(c, 0.7);
+  if (kind === "boss") {
+    tone(c, { type: "sine", freq: 90 * p, to: 70, dur: 0.7, vol: vol * 1.2 });
+    tone(c, { type: "sine", freq: 181 * p, dur: 0.6, vol: vol * 0.5 });
+    tone(c, { type: "sine", freq: 273 * p, dur: 0.4, vol: vol * 0.3 });
+  } else if (kind === "brute") {
+    tone(c, {
+      type: "square",
+      freq: 330 * p,
+      to: 250,
+      dur: 0.14,
+      vol: vol * 0.3,
+    });
+    tone(c, { type: "sine", freq: 540 * p, dur: 0.25, vol: vol * 0.4 });
+    noise(c, {
+      filter: "bandpass",
+      freq: 2500,
+      q: 5,
+      dur: 0.1,
+      vol: vol * 0.5,
+    });
+  } else {
+    const base = kind === "runner" ? 900 : 650;
+    tone(c, {
+      type: "triangle",
+      freq: base * p,
+      to: base * 1.8 * p,
+      dur: 0.11,
+      vol: vol * 0.8,
+    });
+    tone(c, {
+      type: "sine",
+      freq: 200 * p,
+      to: 120,
+      dur: 0.08,
+      vol: vol * 0.5,
+    });
+  }
+}
+
+/** Satisfying pop plus crunch; bigger for brute, huge for boss. */
+export function enemyKilled(kind: string) {
+  const c = ready(`ekill-${kind}`, 50);
+  if (!c) return;
+  const p = rand(0.94, 1.06);
+  if (kind === "boss") {
+    claim(c, 2);
+    noise(c, { filter: "lowpass", freq: 3000, to: 80, dur: 1.2, vol: 0.8 });
+    tone(c, { type: "sine", freq: 120, to: 30, dur: 1, vol: 0.7 });
+    [784, 659, 523, 392, 261].forEach((f, i) => {
+      tone(c, {
+        type: "triangle",
+        freq: f,
+        dur: 0.25,
+        vol: 0.2,
+        delay: 0.5 + i * 0.13,
+      });
+    });
+    return;
+  }
+  const big = kind === "brute";
+  claim(c, 0.4);
+  tone(c, {
+    type: "sine",
+    freq: (big ? 260 : 520) * p,
+    to: big ? 70 : 160,
+    dur: big ? 0.28 : 0.16,
+    vol: big ? 0.5 : 0.35,
+  });
+  tone(c, {
+    type: "triangle",
+    freq: (big ? 600 : 1000) * p,
+    to: 300,
+    dur: 0.08,
+    vol: 0.18,
+  });
+  noise(c, {
+    filter: "bandpass",
+    freq: 2200,
+    q: 1.5,
+    dur: big ? 0.2 : 0.1,
+    vol: big ? 0.4 : 0.22,
+    delay: 0.02,
+  });
+}
+
+let heartbeat: ReturnType<typeof setInterval> | null = null;
+
+function beat() {
+  const c = ready();
+  if (!c) return;
+  claim(c, 0.4);
+  tone(c, { type: "sine", freq: 70, to: 45, dur: 0.14, vol: 0.35 });
+  tone(c, {
+    type: "sine",
+    freq: 62,
+    to: 40,
+    dur: 0.16,
+    vol: 0.28,
+    delay: 0.17,
+  });
+}
+
+/** Stops the low-health heartbeat. */
+export function stopHeartbeat() {
+  if (heartbeat) clearInterval(heartbeat);
+  heartbeat = null;
+}
+
+/** Alarm thud; starts or stops the heartbeat depending on core hp. */
+export function coreHit(hp: number) {
+  const c = ready("coreHit", 80);
+  if (c) {
+    claim(c, 0.5);
+    tone(c, { type: "sine", freq: 100, to: 40, dur: 0.35, vol: 0.6 });
+    noise(c, { filter: "lowpass", freq: 500, dur: 0.2, vol: 0.3 });
+    tone(c, { type: "square", freq: 880, dur: 0.07, vol: 0.07 });
+    tone(c, { type: "square", freq: 660, dur: 0.07, vol: 0.07, delay: 0.1 });
+  }
+  updateCoreHp(hp);
+}
+
+/** Starts the heartbeat at hp <= 30 and stops it when hp recovers. */
+export function updateCoreHp(hp: number) {
+  if (hp > 0 && hp <= 30) {
+    if (!heartbeat) heartbeat = setInterval(beat, 900);
+  } else {
+    stopHeartbeat();
+  }
 }
