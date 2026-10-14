@@ -4,7 +4,7 @@ import { addXp } from "./progression";
 import { gameStore } from "./store";
 import { setRunEndHandler, startRun, tickWaves } from "./waves";
 
-const BEST_KEY = "gravity-shift:best";
+const BEST_KEY = "gravity-shift:best-defense";
 const COMBO_WINDOW_MS = 1200;
 const MAX_MULT = 4;
 

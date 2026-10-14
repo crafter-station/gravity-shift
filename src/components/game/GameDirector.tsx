@@ -3,7 +3,10 @@
 import { useFrame, useThree } from "@react-three/fiber";
 import { useEffect } from "react";
 import { Vector3 } from "three";
+import { on } from "@/game/events";
+import { enemies, player, props } from "@/game/registry";
 import { initScoring, popupSlots, tickRound } from "@/game/score";
+import { gameStore } from "@/game/store";
 
 const v = new Vector3();
 
@@ -13,6 +16,16 @@ export function GameDirector() {
 
   useEffect(() => {
     initScoring();
+    // Dev-only handle for inspecting the live game from the console.
+    if (process.env.NODE_ENV !== "production") {
+      (window as unknown as Record<string, unknown>).__gs = {
+        enemies,
+        props,
+        player,
+        store: gameStore,
+        on,
+      };
+    }
   }, []);
 
   useFrame((state, dt) => {

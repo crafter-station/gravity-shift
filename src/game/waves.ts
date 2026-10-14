@@ -23,7 +23,7 @@ export const ENEMY_STATS: Record<
   minion: {
     radius: 0.45,
     hp: 1,
-    speed: 2.4,
+    speed: 1.7,
     coreDamage: 6,
     points: 20,
     density: 1,
@@ -33,7 +33,7 @@ export const ENEMY_STATS: Record<
   runner: {
     radius: 0.36,
     hp: 0.6,
-    speed: 4.2,
+    speed: 3.2,
     coreDamage: 4,
     points: 25,
     density: 0.8,
@@ -43,17 +43,17 @@ export const ENEMY_STATS: Record<
   brute: {
     radius: 0.8,
     hp: 6,
-    speed: 1.5,
+    speed: 1.2,
     coreDamage: 15,
     points: 70,
     density: 2.5,
     stun: 0.35,
-    huskTier: 3,
+    huskTier: 2,
   },
   boss: {
     radius: 1.7,
-    hp: 45,
-    speed: 0.9,
+    hp: 35,
+    speed: 0.75,
     coreDamage: 45,
     points: 500,
     density: 3,
@@ -77,7 +77,12 @@ const run = {
   /** Spawn requests handed to <Enemies /> but not yet registered. */
   pending: 0,
   clearedAt: 0,
+  /** Seconds since the last mid-wave supply drop. */
+  sinceDrop: 0,
 };
+/** From this wave on, crates also rain during the wave so ammo never runs dry. */
+const MID_WAVE_DROPS_FROM = 3;
+const MID_WAVE_DROP_EVERY = 18;
 
 type SpawnRequest = { kind: EnemyKind; x: number; z: number };
 const spawnListeners = new Set<(r: SpawnRequest) => void>();
@@ -127,6 +132,7 @@ function startWave(n: number) {
   run.t = 0;
   run.pending = 0;
   run.clearedAt = 0;
+  run.sinceDrop = 0;
   gameStore.set({ wave: n, enemiesLeft: run.spawns.length });
   emit("waveStart", {
     wave: n,
@@ -186,7 +192,7 @@ export function pickUpgrade(id: UpgradeId) {
   if (id === "repair") patch.coreHp = Math.min(s.coreMaxHp, s.coreHp + 35);
   gameStore.set(patch);
   emit("upgradePicked", { id });
-  emit("supplyDrop", { count: 8 });
+  emit("supplyDrop", { count: 8 + s.wave });
   input.enabled = true;
   startWave(s.wave + 1);
 }
@@ -220,6 +226,16 @@ export function enemyRemoved(killed: boolean) {
 export function tickWaves(dt: number) {
   if (gameStore.get().phase !== "playing") return;
   run.t += Math.min(dt, 0.1);
+  run.sinceDrop += Math.min(dt, 0.1);
+  const wave = gameStore.get().wave;
+  if (
+    wave >= MID_WAVE_DROPS_FROM &&
+    run.sinceDrop > MID_WAVE_DROP_EVERY &&
+    enemies.size > 0
+  ) {
+    run.sinceDrop = 0;
+    emit("supplyDrop", { count: 4 + Math.floor(wave / 2) });
+  }
 
   while (
     run.next < run.spawns.length &&

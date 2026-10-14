@@ -14,7 +14,7 @@ const COLORS = [
   "#ff9f1c",
 ];
 /** Keep the newest supply crates only (physics budget). */
-const MAX_CRATES = 24;
+const MAX_CRATES = 36;
 
 type Crate = {
   id: number;
