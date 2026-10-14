@@ -2,9 +2,12 @@
 
 import { BeachBall } from "./props/BeachBall";
 import { Bench } from "./props/Bench";
+import { Bus } from "./props/Bus";
 import { Car } from "./props/Car";
 import { Cone } from "./props/Cone";
 import { Crate } from "./props/Crate";
+import { FoodCart } from "./props/FoodCart";
+import { Kiosk } from "./props/Kiosk";
 
 type V3 = [number, number, number];
 
@@ -49,6 +52,26 @@ const BALLS: V3[] = [
   [-15, 0, 14],
 ];
 
+/** Tier 5: parked along the east hedge, clear of the (14, 7) reserved zone. */
+const BUS: { p: V3; r: number; c: string } = {
+  p: [16, 0, 0.5],
+  r: 0,
+  c: "#ffd23f",
+};
+
+/** Tier 4 ice-cream kiosks, serving windows toward the plaza center. */
+const KIOSKS: { p: V3; r: number }[] = [
+  { p: [-16, 0, -10], r: Math.PI / 2 },
+  { p: [9, 0, 12.5], r: Math.PI },
+];
+
+/** Tier 2 food carts. */
+const CARTS: { p: V3; r: number }[] = [
+  { p: [-9, 0, 3], r: 0.4 },
+  { p: [6, 0, -15.5], r: 0.2 },
+  { p: [-1, 0, -8], r: -0.3 },
+];
+
 /** All grabbable props in the plaza, grouped in small clusters. */
 export function Props() {
   return (
@@ -73,6 +96,13 @@ export function Props() {
       ))}
       {BALLS.map((p) => (
         <BeachBall key={p.join()} position={p} />
+      ))}
+      <Bus position={BUS.p} rotationY={BUS.r} color={BUS.c} />
+      {KIOSKS.map((k) => (
+        <Kiosk key={k.p.join()} position={k.p} rotationY={k.r} />
+      ))}
+      {CARTS.map((c) => (
+        <FoodCart key={c.p.join()} position={c.p} rotationY={c.r} />
       ))}
     </>
   );
